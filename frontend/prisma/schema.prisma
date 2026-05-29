@@ -1,0 +1,340 @@
+datasource db {
+  provider  = "postgresql"
+  // Runtime connection — Supabase transaction pooler (port 6543).
+  url       = env("DATABASE_URL")
+  // Migration-only direct connection (port 5432). Falls back to DATABASE_URL
+  // when DIRECT_URL is unset.
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Identity / auth
+// ──────────────────────────────────────────────────────────────────────
+// Privy = authentication. Email or external EVM wallet are both auth
+// methods. They are NEVER the betting wallet.
+// ──────────────────────────────────────────────────────────────────────
+
+model User {
+  id                    String   @id @default(cuid())
+  privyUserId           String   @unique @map("privy_user_id")
+  email                 String?
+  primaryExternalWallet String?  @map("primary_external_wallet")
+  isAdmin               Boolean  @default(false) @map("is_admin")
+
+  // User-controlled preferences (theme, notification toggles, etc.).
+  // Shape lives in src/lib/user-preferences.ts and is migrated in code.
+  preferences           Json?
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  linkedWallets         LinkedWallet[]
+  circleWallet          CircleWallet?
+
+  walletBalance         WalletBalance?
+  transactions          WalletTransaction[]
+  bets                  Bet[]
+  positions             Position[]
+  suggestions           MarketSuggestion[] @relation("UserSuggestions")
+  reviewedSuggestions   MarketSuggestion[] @relation("ReviewerSuggestions")
+
+  @@map("users")
+}
+
+/// External EVM wallets the user has connected via Privy.
+/// Used for: login, account linking, funding, withdrawal destination.
+/// NEVER used as the betting wallet.
+model LinkedWallet {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  address    String
+  walletType String   @default("EXTERNAL") @map("wallet_type") // EXTERNAL
+  chainType  String   @default("EVM")      @map("chain_type")  // EVM
+  provider   String   @default("PRIVY")                         // PRIVY
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, address])
+  @@map("linked_wallets")
+}
+
+/// The user's Genetia Wallet — a Circle Developer-Controlled SCA wallet.
+/// Exactly one per user. All deposits, balances, bets, settlement,
+/// winnings, and withdrawals flow through this.
+model CircleWallet {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  circleWalletId  String   @unique @map("circle_wallet_id")
+  address         String
+  blockchain      String   @default("ARC-TESTNET")
+  accountType     String   @default("SCA") @map("account_type")
+  walletSetId     String   @map("wallet_set_id")
+  provider        String   @default("CIRCLE")
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@map("circle_wallets")
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Internal ledger
+// ──────────────────────────────────────────────────────────────────────
+// Mirrors the on-chain Circle balance with available/locked/pending
+// accounting. Lets us settle bets without waiting for each on-chain hop.
+// ──────────────────────────────────────────────────────────────────────
+
+model WalletBalance {
+  id               String   @id @default(cuid())
+  userId           String   @unique @map("user_id")
+  availableBalance Decimal  @default(0) @map("available_balance") @db.Decimal(18, 6)
+  lockedBalance    Decimal  @default(0) @map("locked_balance")    @db.Decimal(18, 6)
+  pendingBalance   Decimal  @default(0) @map("pending_balance")   @db.Decimal(18, 6)
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("wallet_balances")
+}
+
+model WalletTransaction {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  txHash    String?  @map("tx_hash")
+  amount    Decimal  @db.Decimal(18, 6)
+  type      String   // DEPOSIT | WITHDRAWAL | BET_LOCK | BET_RELEASE | PAYOUT | FEE
+  status    String   @default("pending") // pending | confirmed | failed
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  // Production-grade deposit dedupe: a given Circle inbound transfer (or any
+  // on-chain tx hash) can only be credited to a user once. Postgres treats
+  // NULL as distinct, so internal-only transactions (BET_LOCK, BET_RELEASE,
+  // PAYOUT, FEE) with no tx hash are unaffected.
+  @@unique([userId, txHash])
+  @@map("wallet_transactions")
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Markets / bets
+// ──────────────────────────────────────────────────────────────────────
+
+model Market {
+  id               String    @id @default(cuid())
+  title            String
+  description      String    @db.Text
+  category         String
+  expiry           DateTime
+  status              String    @default("pending") // pending | active | paused | resolved | refunded | archived
+  // The plain-text criteria GenLayer's LLM uses to decide YES/NO.
+  resolutionCriteria  String?   @db.Text @map("resolution_criteria")
+  // Sources column also doubles as a JSON-encoded URL list when the
+  // suggestion-approval flow seeds the market — the resolver pipeline
+  // accepts either format via extractSources().
+  resolutionSource    String?   @db.Text @map("resolution_source")
+  createdBy        String    @map("created_by")
+  arcAddress       String?   @unique @map("arc_address")
+  // Cached mirrors of on-chain state, indexer-maintained.
+  // For LMSR markets these mean "outstanding YES/NO shares" (qYes / qNo
+  // in the contract). Same column, repurposed semantic.
+  yesPool          Decimal   @default(0) @map("yes_pool") @db.Decimal(28, 6)
+  noPool           Decimal   @default(0) @map("no_pool")  @db.Decimal(28, 6)
+  // ── LMSR-specific (null for legacy parimutuel rows) ─────────────────
+  /// uint256 id assigned by LMSRMarketFactory. Used to derive ERC-1155 ids.
+  marketIdOnChain  Decimal?  @map("market_id_on_chain") @db.Decimal(78, 0)
+  /// LMSR liquidity parameter b, in 6-dec USDC.
+  lmsrB            Decimal?  @map("lmsr_b") @db.Decimal(28, 6)
+  /// USDC collateral currently held by the Market contract.
+  lmsrCollateral   Decimal?  @map("lmsr_collateral") @db.Decimal(28, 6)
+  /// Fees swept-ready bucket.
+  lmsrFees         Decimal?  @map("lmsr_fees") @db.Decimal(28, 6)
+  /// Active | Pending | Disputed | Finalized (mirrors contract enum).
+  lmsrStatus       String?   @map("lmsr_status")
+  /// YES | NO | INVALID once Pending or Finalized.
+  proposedOutcome  String?   @map("proposed_outcome")
+  /// Unix seconds when proposeResolution() landed (start of 24h window).
+  pendingSince     DateTime? @map("pending_since")
+  /// Dispute bond holder + amount (USDC, 6-dec).
+  disputeBondHolder String?  @map("dispute_bond_holder")
+  disputeBondAmount Decimal? @map("dispute_bond_amount") @db.Decimal(28, 6)
+  /// Block number the indexer last reconciled this market through.
+  lastIndexedBlock Decimal?  @map("last_indexed_block") @db.Decimal(28, 0)
+
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  bets       Bet[]
+  positions  Position[]
+  settlement Settlement?
+  suggestion MarketSuggestion?
+  arcTrades  ArcTrade[]
+
+  @@index([status])
+  @@index([category])
+  @@index([lmsrStatus])
+  @@map("markets")
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// On-chain LMSR trades — indexer-populated event log
+// ──────────────────────────────────────────────────────────────────────
+// Source of truth lives on Arc; this table is purely a fast cache for the
+// frontend (probability-history chart, user trade list, leaderboard).
+// Reconcile-able: drop the table and replay events to rebuild it.
+// ──────────────────────────────────────────────────────────────────────
+
+model ArcTrade {
+  id            String   @id @default(cuid())
+  marketId      String   @map("market_id")
+  /// Buyer/seller address — may NOT exist as a User row (any address can hold tokens).
+  userAddress   String   @map("user_address")
+  /// "buy" | "sell" | "redeem"
+  action        String
+  /// "YES" | "NO" (for buy/sell). For redeem, side is whichever the user burned.
+  side          String
+  /// USDC paid (buy) / received (sell, redeem). 6-dec.
+  amount        Decimal  @db.Decimal(28, 6)
+  /// Shares minted (buy) / burned (sell, redeem).
+  shares        Decimal  @db.Decimal(28, 6)
+  /// Fee charged on this trade (buy only). 6-dec.
+  fee           Decimal  @default(0) @db.Decimal(28, 6)
+  /// Effective price = amount / shares, in 1e18 fixed-point.
+  effectivePrice Decimal? @db.Decimal(28, 18)
+  /// On-chain tx hash that produced this event.
+  txHash        String   @map("tx_hash")
+  /// Block number containing the tx — used by the indexer to resume.
+  blockNumber   Decimal  @map("block_number") @db.Decimal(28, 0)
+  /// Block timestamp (off-chain copy, for chart x-axis).
+  blockTime     DateTime @map("block_time")
+
+  market Market @relation(fields: [marketId], references: [id])
+
+  // Same on-chain event can't be inserted twice.
+  @@unique([txHash, action, userAddress, shares])
+  @@index([marketId])
+  @@index([userAddress])
+  @@map("arc_trades")
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Indexer cursor — last processed block per named feed
+// ──────────────────────────────────────────────────────────────────────
+
+model IndexerCursor {
+  name        String   @id
+  blockNumber Decimal  @map("block_number") @db.Decimal(28, 0)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("indexer_cursors")
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Public market suggestions
+// ──────────────────────────────────────────────────────────────────────
+// Polymarket-style review queue. Any signed-in user can suggest a market.
+// Admins approve / edit / reject from the dashboard. Approval mints a real
+// Market row and links it back via `marketId`.
+// ──────────────────────────────────────────────────────────────────────
+
+model MarketSuggestion {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  question        String
+  description     String?   @db.Text
+  category        String
+  expiry          DateTime
+  criteria        String    @db.Text
+  sources         Json      // string[] of URLs
+  status          String    @default("pending") // pending | approved | rejected
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  reviewedBy      String?   @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  marketId        String?   @unique @map("market_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user     User    @relation("UserSuggestions",     fields: [userId],     references: [id])
+  reviewer User?   @relation("ReviewerSuggestions", fields: [reviewedBy], references: [id])
+  market   Market? @relation(fields: [marketId], references: [id])
+
+  @@index([status])
+  @@index([userId])
+  @@map("market_suggestions")
+}
+
+model Bet {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  marketId  String    @map("market_id")
+  side      String    // YES | NO
+  amount    Decimal   @db.Decimal(18, 6)
+  odds      Decimal   @db.Decimal(6, 4)
+  status    String    @default("active") // active | won | lost | cancelled | refunded
+  createdAt DateTime  @default(now()) @map("created_at")
+  settledAt DateTime? @map("settled_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@index([userId])
+  @@index([marketId])
+  @@index([status])
+  @@map("bets")
+}
+
+model Position {
+  id       String  @id @default(cuid())
+  userId   String  @map("user_id")
+  marketId String  @map("market_id")
+  exposure Decimal @default(0) @db.Decimal(18, 6)
+  pnl      Decimal @default(0) @db.Decimal(18, 6)
+
+  user   User   @relation(fields: [userId], references: [id])
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@unique([userId, marketId])
+  @@map("positions")
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Settlement (GenLayer ↔ Arc ↔ off-chain ledger)
+// ──────────────────────────────────────────────────────────────────────
+
+model Settlement {
+  id             String   @id @default(cuid())
+  marketId       String   @unique @map("market_id")
+
+  // pending | pending_resolve | resolving | finalized | submitted_to_arc | consensus_failure | refunded | failed
+  status         String   @default("pending")
+
+  resolution     String?  // YES | NO
+  reasoning      String?  @db.Text
+  confidence     Decimal? @db.Decimal(5, 4)
+  sources        Json?
+
+  genlayerTxHash String?  @map("genlayer_tx_hash")
+  arcTxHash      String?  @map("arc_tx_hash")
+
+  // Off-chain timestamps (GenLayer contract stores none)
+  requestedAt    DateTime  @default(now()) @map("requested_at")
+  submittedAt    DateTime? @map("submitted_at")
+  finalizedAt    DateTime? @map("finalized_at")
+  arcResolvedAt  DateTime? @map("arc_resolved_at")
+  settledAt      DateTime  @default(now()) @map("settled_at")
+
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@index([status])
+  @@map("settlements")
+}

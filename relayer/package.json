@@ -1,0 +1,20 @@
+{
+  "name": "genetia-relayer",
+  "version": "0.2.0",
+  "description": "Genetia resolver pipeline trigger — pings the Next.js cron endpoint on a schedule",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.5",
+    "ts-node": "^10.9.2"
+  }
+}

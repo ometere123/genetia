@@ -5,24 +5,17 @@
  *   node scripts/reset-markets.mjs            # dry run (default)
  *   node scripts/reset-markets.mjs --commit   # actually delete
  *
- * Wipes everything market/trade related so we can start fresh:
+ * Wipes everything market/trade related AND all non-admin users:
  *   - markets, market_suggestions
  *   - bets, positions
  *   - settlements
  *   - arc_trades, indexer_cursors
- *   - market-related wallet_transactions (BET_LOCK, BET_RELEASE, PAYOUT,
- *     BET_LOSS, FEE) — keeps DEPOSIT and WITHDRAWAL audit trail
- *   - wallet_balances reset to 0 (will resync from Circle on next /wallet)
+ *   - all wallet_transactions
+ *   - wallet_balances
+ *   - circle_wallets, linked_wallets
+ *   - users (except admin — identified by isAdmin=true or ADMIN_WALLET_ADDRESS)
  *
- * Keeps untouched:
- *   - users
- *   - circle_wallets
- *   - linked_wallets
- *
- * Note: this does NOT touch anything on-chain. The LMSRMarketFactory still
- * holds the registry of past markets, and outcome tokens you minted before
- * still exist in your Circle wallet. Those are testnet so it doesn't matter,
- * but be aware.
+ * Note: this does NOT touch anything on-chain. Testnet only.
  */
 
 import fs from "node:fs";
@@ -47,33 +40,39 @@ loadEnvFile(path.join(process.cwd(), ".env"));
 loadEnvFile(path.join(process.cwd(), ".env.local"));
 
 const commit = process.argv.includes("--commit");
+const ADMIN_ADDRESS = (process.env.ADMIN_WALLET_ADDRESS ?? process.env.NEXT_PUBLIC_ADMIN_ADDRESS ?? "").toLowerCase();
 
 const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log(`Mode: ${commit ? "COMMIT (will delete)" : "DRY RUN (no changes)"}\n`);
+  console.log(`Mode: ${commit ? "COMMIT (will delete)" : "DRY RUN (no changes)"}`);
+  console.log(`Admin wallet kept: ${ADMIN_ADDRESS || "(none set — all users deleted)"}\n`);
 
-  // Counts before
+  // Find admin user IDs to preserve
+  const adminUsers = await prisma.user.findMany({
+    where: {
+      OR: [
+        { isAdmin: true },
+        ...(ADMIN_ADDRESS ? [{ primaryExternalWallet: { equals: ADMIN_ADDRESS, mode: "insensitive" } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  const adminIds = adminUsers.map((u) => u.id);
+
   const counts = {
-    markets:           await prisma.market.count(),
-    bets:              await prisma.bet.count(),
-    positions:         await prisma.position.count(),
-    settlements:       await prisma.settlement.count(),
-    suggestions:       await prisma.marketSuggestion.count(),
-    arcTrades:         await prisma.arcTrade.count(),
-    cursors:           await prisma.indexerCursor.count(),
-    marketTxs:         await prisma.walletTransaction.count({
-                         where: {
-                           type: { in: ["BET_LOCK", "BET_RELEASE", "PAYOUT", "BET_LOSS", "FEE"] },
-                         },
-                       }),
-    walletBalances:    await prisma.walletBalance.count(),
-    usersKept:         await prisma.user.count(),
-    walletsKept:       await prisma.circleWallet.count(),
-    linkedWalletsKept: await prisma.linkedWallet.count(),
-    deposits:          await prisma.walletTransaction.count({ where: { type: "DEPOSIT" } }),
-    withdrawals:       await prisma.walletTransaction.count({ where: { type: "WITHDRAWAL" } }),
+    markets:        await prisma.market.count(),
+    bets:           await prisma.bet.count(),
+    positions:      await prisma.position.count(),
+    settlements:    await prisma.settlement.count(),
+    suggestions:    await prisma.marketSuggestion.count(),
+    arcTrades:      await prisma.arcTrade.count(),
+    cursors:        await prisma.indexerCursor.count(),
+    allTxns:        await prisma.walletTransaction.count(),
+    walletBalances: await prisma.walletBalance.count(),
+    nonAdminUsers:  await prisma.user.count({ where: { id: { notIn: adminIds } } }),
+    adminKept:      adminIds.length,
   };
 
   console.log("─── Will delete ─────────────────────────────────────────────");
@@ -84,14 +83,11 @@ async function main() {
   console.log(`  settlements:            ${counts.settlements}`);
   console.log(`  arc_trades:             ${counts.arcTrades}`);
   console.log(`  indexer_cursors:        ${counts.cursors}`);
-  console.log(`  market wallet_txns:     ${counts.marketTxs}`);
-  console.log(`  wallet_balances:        ${counts.walletBalances} (reset to 0; resync from chain)`);
+  console.log(`  wallet_transactions:    ${counts.allTxns}`);
+  console.log(`  wallet_balances:        ${counts.walletBalances}`);
+  console.log(`  non-admin users:        ${counts.nonAdminUsers}`);
   console.log("\n─── Will keep ───────────────────────────────────────────────");
-  console.log(`  users:                  ${counts.usersKept}`);
-  console.log(`  circle_wallets:         ${counts.walletsKept}`);
-  console.log(`  linked_wallets:         ${counts.linkedWalletsKept}`);
-  console.log(`  DEPOSIT wallet_txns:    ${counts.deposits}`);
-  console.log(`  WITHDRAWAL wallet_txns: ${counts.withdrawals}`);
+  console.log(`  admin users:            ${counts.adminKept} (${adminIds.join(", ") || "none"})`);
   console.log("");
 
   if (!commit) {
@@ -102,29 +98,26 @@ async function main() {
 
   console.log("Deleting…\n");
 
+  // Step 1: delete everything that references markets or non-admin users
   await prisma.$transaction([
-    // FK order: things that reference markets first.
     prisma.arcTrade.deleteMany({}),
     prisma.bet.deleteMany({}),
     prisma.position.deleteMany({}),
     prisma.settlement.deleteMany({}),
-    // suggestions are FK'd to markets via marketId; null out + delete
     prisma.marketSuggestion.deleteMany({}),
     prisma.market.deleteMany({}),
     prisma.indexerCursor.deleteMany({}),
-    prisma.walletTransaction.deleteMany({
-      where: { type: { in: ["BET_LOCK", "BET_RELEASE", "PAYOUT", "BET_LOSS", "FEE"] } },
-    }),
-    // Reset balances. Next /api/wallets/balance fetch overwrites available
-    // from Circle's on-chain USDC balance anyway.
-    prisma.walletBalance.updateMany({
-      data: { availableBalance: 0, lockedBalance: 0, pendingBalance: 0 },
-    }),
+    prisma.walletTransaction.deleteMany({}),
+    prisma.walletBalance.deleteMany({}),
   ]);
 
+  // Step 2: delete non-admin user data (FK order)
+  await prisma.linkedWallet.deleteMany({ where: { userId: { notIn: adminIds } } });
+  await prisma.circleWallet.deleteMany({ where: { userId: { notIn: adminIds } } });
+  await prisma.user.deleteMany({ where: { id: { notIn: adminIds } } });
+
   console.log("✓ Clean slate committed.\n");
-  console.log("Next: restart your dev server so Prisma reconnects, then visit /wallet");
-  console.log("to refresh balances from Circle.");
+  console.log("Next: visit the app — users will re-register fresh on next login.");
 
   await prisma.$disconnect();
 }

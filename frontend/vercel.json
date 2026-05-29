@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/resolve-markets",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/index-arc",
+      "schedule": "* * * * *"
+    }
+  ]
+}

@@ -8,11 +8,12 @@ import { useTranslations, useLocale } from "next-intl";
 import {
   Search, Bell, ChevronDown, User, Settings, LogOut,
   TrendingUp, Globe, Shield, ArrowDownToLine, Wallet,
-  Loader2, CreditCard, Menu, X,
+  Loader2, CreditCard, Menu, X, Sun, Moon,
 } from "lucide-react";
 import { shortAddr } from "../lib/format";
 import { locales, localeNames, localeFlags, type Locale } from "../i18n/config";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 import clsx from "clsx";
 
 const ADMIN_SLUG = process.env.NEXT_PUBLIC_ADMIN_SLUG ?? "/admin";
@@ -42,6 +43,7 @@ export default function Navbar() {
   } = useAuth();
 
   const { user, ready, authenticated } = usePrivy();
+  const { resolved: themeResolved, setMode: setThemeMode } = useTheme();
 
   // Admin flag: set via env or database
   const isAdmin = !!process.env.NEXT_PUBLIC_ADMIN_ADDRESS &&
@@ -154,6 +156,17 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* Theme toggle — flips between dark and light. Stays in sync
+              with the Settings → Appearance picker via ThemeContext. */}
+          <button
+            onClick={() => setThemeMode(themeResolved === "dark" ? "light" : "dark")}
+            aria-label={themeResolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={themeResolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-surface-2 text-slate-400 hover:text-white hover:border-border-strong transition-all"
+          >
+            {themeResolved === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+
           {/* Hamburger — replaces the desktop nav row on < lg */}
           <button
             onClick={() => setMobileNavOpen(true)}

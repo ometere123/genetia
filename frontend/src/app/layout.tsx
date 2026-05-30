@@ -8,7 +8,7 @@ import Providers from "./providers";
 import Navbar from "../components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Genetia — Prediction Markets",
+  title: "Genetia Markets",
   description: "AI-resolved prediction markets on Arc, powered by GenLayer",
   // favicon served automatically from app/icon.svg
 };

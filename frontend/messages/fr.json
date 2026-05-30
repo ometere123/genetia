@@ -46,8 +46,8 @@
     "breaking": "Actualités",
     "exploreAll": "Tout explorer →",
     "hotTopics": "Sujets chauds",
-    "aiResolved": "Marchés Résolus par IA",
-    "aiResolvedDesc": "Les validateurs GenLayer récupèrent des données en direct et atteignent un consensus pour résoudre les marchés — sans vote UMA, sans litiges."
+    "aiResolved": "Marchés Résolus par GenLayer",
+    "aiResolvedDesc": "Les validateurs GenLayer récupèrent des données en direct et atteignent un consensus pour résoudre les marchés."
   },
   "trading": {
     "placeATrade": "Passer un ordre",

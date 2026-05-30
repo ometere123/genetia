@@ -1080,15 +1080,32 @@ function ReviewQueueTab({ onApproved }: { onApproved: () => void }) {
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [items, setItems] = useState<SuggestionRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await authedFetch(`/api/admin/suggestions?status=${filter}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = body?.error ?? `HTTP ${res.status}`;
+        setError(
+          res.status === 401
+            ? "Session expired — refresh the page to sign in again."
+            : res.status === 403
+            ? "Forbidden — this account is not an admin."
+            : msg
+        );
+        setItems([]);
+        return;
+      }
       const data = await res.json();
       setItems(data.suggestions ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load queue");
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -1159,6 +1176,16 @@ function ReviewQueueTab({ onApproved }: { onApproved: () => void }) {
       {loading ? (
         <div className="flex items-center justify-center py-12 gap-2 text-slate-500 text-sm">
           <Loader2 size={14} className="animate-spin" /> Loading queue…
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center text-sm">
+          <p className="text-no mb-2">{error}</p>
+          <button
+            onClick={fetchQueue}
+            className="text-[12px] text-brand-light hover:underline"
+          >
+            Retry
+          </button>
         </div>
       ) : items.length === 0 ? (
         <div className="p-12 text-center text-sm text-slate-500">

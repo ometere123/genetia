@@ -4,11 +4,13 @@
  * GET /api/admin/analytics  — platform-level metrics
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAdmin, adminErrorResponse } from "@/lib/admin-auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    await requireAdmin(req);
     const [
       totalUsers,
       totalMarkets,
@@ -77,7 +79,6 @@ export async function GET() {
       },
     });
   } catch (err) {
-    console.error("[admin/analytics]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return adminErrorResponse(err);
   }
 }

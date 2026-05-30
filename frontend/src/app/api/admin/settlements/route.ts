@@ -4,11 +4,13 @@
  * GET /api/admin/settlements  — list settlements with GenLayer data
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAdmin, adminErrorResponse } from "@/lib/admin-auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    await requireAdmin(req);
     const settlements = await prisma.settlement.findMany({
       include: {
         market: {
@@ -27,7 +29,6 @@ export async function GET() {
 
     return NextResponse.json({ settlements });
   } catch (err) {
-    console.error("[admin/settlements]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return adminErrorResponse(err);
   }
 }

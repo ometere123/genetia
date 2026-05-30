@@ -89,11 +89,29 @@ export default function Navbar() {
       <div className="mx-auto max-w-[1400px] flex items-center gap-4 px-4 h-14">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 mr-2">
-          <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center">
-            <TrendingUp size={16} className="text-white" strokeWidth={2.5} />
-          </div>
-          <span className="font-bold text-white text-base tracking-tight">Genetia</span>
+        <Link href="/" className="flex items-center gap-2 shrink-0 mr-2" aria-label="Genetia home">
+          <svg viewBox="0 0 200 200" className="h-8 w-8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="genetiaMark" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#7c5cff" />
+                <stop offset="1" stopColor="#22d3ee" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M150 60 A55 55 0 1 0 150 140 L150 110 L110 110"
+              fill="none" stroke="url(#genetiaMark)" strokeWidth="18"
+              strokeLinecap="round" strokeLinejoin="round"
+            />
+            <path
+              d="M58 132 L86 108 L108 124 L150 78"
+              fill="none" stroke="url(#genetiaMark)" strokeWidth="10"
+              strokeLinecap="round" strokeLinejoin="round" opacity="0.95"
+            />
+            <circle cx="150" cy="78" r="9" fill="#22d3ee" />
+          </svg>
+          <span className="font-bold text-base tracking-tight bg-gradient-to-br from-[#7c5cff] to-[#22d3ee] bg-clip-text text-transparent">
+            Genetia
+          </span>
           <span className="hidden sm:inline-flex items-center rounded bg-surface-3 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
             TESTNET
           </span>

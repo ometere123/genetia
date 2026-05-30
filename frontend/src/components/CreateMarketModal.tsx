@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -98,7 +98,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
           <div>
             <h2 className="font-bold text-white">Suggest a market</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Step {step + 1} of {STEP_LABELS.length} — {STEP_LABELS[step]}
+              Step {step + 1} of {STEP_LABELS.length} â€” {STEP_LABELS[step]}
             </p>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-surface-3 transition-colors">
@@ -122,13 +122,13 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
                   You need to be signed in to suggest a market.
                 </p>
                 <button onClick={login} className="text-[11px] text-brand-light hover:text-brand transition-colors font-medium mt-1">
-                  Sign in →
+                  Sign in â†’
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 0 — Market details */}
+          {/* Step 0 â€” Market details */}
           {step === 0 && (
             <>
               <div>
@@ -152,7 +152,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Short context for users browsing the markets list…"
+                  placeholder="Short context for users browsing the markets listâ€¦"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   maxLength={2000}
@@ -193,7 +193,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </>
           )}
 
-          {/* Step 1 — Resolution */}
+          {/* Step 1 â€” Resolution */}
           {step === 1 && (
             <>
               <div>
@@ -208,7 +208,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
                   maxLength={2000}
                   className="w-full rounded-xl bg-surface-2 border border-border px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-brand/50 focus:outline-none resize-none transition-colors"
                 />
-                <p className="text-[11px] text-slate-600 mt-1">{criteria.length}/2000 — be specific about dates, thresholds, and tie-breakers</p>
+                <p className="text-[11px] text-slate-600 mt-1">{criteria.length}/2000 â€” be specific about dates, thresholds, and tie-breakers</p>
               </div>
 
               <div>
@@ -245,20 +245,20 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
               <div className="flex items-start gap-2 rounded-xl bg-brand/5 border border-brand/20 p-3">
                 <Info size={13} className="text-brand-light shrink-0 mt-0.5" />
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  GenLayer AI validators will fetch these URLs and use an LLM to determine the outcome. Be specific about dates, thresholds, and authoritative sources.
+                  GenLayer validators will fetch these URLs and use an LLM to determine the outcome. Be specific about dates, thresholds, and authoritative sources.
                 </p>
               </div>
             </>
           )}
 
-          {/* Step 2 — Review */}
+          {/* Step 2 â€” Review */}
           {step === 2 && (
             <div className="space-y-3">
               {[
                 { label: "Question", value: question },
                 { label: "Category", value: category.charAt(0).toUpperCase() + category.slice(1) },
-                { label: "Closes",   value: endDateStr ? new Date(endDateStr).toLocaleString() : "—" },
-                { label: "Criteria", value: criteria || "—" },
+                { label: "Closes",   value: endDateStr ? new Date(endDateStr).toLocaleString() : "â€”" },
+                { label: "Criteria", value: criteria || "â€”" },
                 { label: "Sources",  value: sources.filter(Boolean).join("\n") || "None" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-4">
@@ -315,7 +315,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
               className="flex-1 rounded-xl bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={13} className="animate-spin" />}
-              {submitting ? "Submitting…" : success ? "Submitted!" : "Submit Suggestion"}
+              {submitting ? "Submittingâ€¦" : success ? "Submitted!" : "Submit Suggestion"}
             </button>
           )}
         </div>

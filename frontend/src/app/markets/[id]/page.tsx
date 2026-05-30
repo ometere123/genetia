@@ -318,7 +318,7 @@ export default function MarketPage() {
         <ChevronLeft size={14} /> All markets
       </Link>
 
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
         {/* Left column */}
         <div className="flex-1 min-w-0 space-y-4">
           {/* Header */}
@@ -504,7 +504,7 @@ export default function MarketPage() {
         </div>
 
         {/* Right column — trading panel */}
-        <aside className="w-80 shrink-0">
+        <aside className="w-full lg:w-80 lg:shrink-0">
           {marketInfo && <TradingPanel market={marketInfo} />}
           <div className="mt-4 space-y-4">
             <div className="rounded-2xl border border-border bg-surface-1 p-5">

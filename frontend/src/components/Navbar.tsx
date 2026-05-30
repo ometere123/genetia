@@ -8,7 +8,7 @@ import { useTranslations, useLocale } from "next-intl";
 import {
   Search, Bell, ChevronDown, User, Settings, LogOut,
   TrendingUp, Globe, Shield, ArrowDownToLine, Wallet,
-  Loader2, CreditCard,
+  Loader2, CreditCard, Menu, X,
 } from "lucide-react";
 import { shortAddr } from "../lib/format";
 import { locales, localeNames, localeFlags, type Locale } from "../i18n/config";
@@ -33,6 +33,7 @@ export default function Navbar() {
   const [searchQuery,  setSearchQuery]  = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const {
     login, logout: authLogout, openDepositModal,
@@ -117,8 +118,8 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Search */}
-        <div className="flex-1 max-w-md relative">
+        {/* Search — hidden on phones, the hamburger drawer hosts it */}
+        <div className="hidden md:block flex-1 max-w-md relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
@@ -128,6 +129,9 @@ export default function Navbar() {
             className="w-full bg-surface-2 border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand/60 focus:bg-surface-3 transition-all"
           />
         </div>
+
+        {/* spacer so the right cluster hugs the edge on mobile */}
+        <div className="md:hidden flex-1" />
 
         {/* Nav links */}
         <nav className="hidden lg:flex items-center gap-1">
@@ -150,6 +154,15 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* Hamburger — replaces the desktop nav row on < lg */}
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open menu"
+            className="lg:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-border bg-surface-2 text-slate-300 hover:text-white hover:border-border-strong transition-all"
+          >
+            <Menu size={16} />
+          </button>
+
           {/* Language switcher */}
           <div className="relative">
             <button
@@ -305,6 +318,90 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile drawer */}
+      {mobileNavOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60]">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div className="absolute right-0 top-0 h-full w-72 max-w-[85%] bg-surface-1 border-l border-border shadow-2xl flex flex-col animate-fade-in">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-border">
+              <span className="text-sm font-semibold text-white">Menu</span>
+              <button
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close menu"
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-surface-2 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Search on mobile */}
+            <div className="p-3 border-b border-border">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder={t("searchPlaceholder")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-surface-2 border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand/60 focus:bg-surface-3 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Nav links */}
+            <nav className="flex-1 overflow-y-auto py-2">
+              {navLinks.map(({ href, key }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileNavOpen(false)}
+                  className={clsx(
+                    "flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors",
+                    activePath === href || (key === "admin" && activePath.startsWith(`/${ADMIN_SLUG}`))
+                      ? "bg-surface-3 text-white border-l-2 border-brand"
+                      : "text-slate-400 hover:text-white hover:bg-surface-2"
+                  )}
+                >
+                  {key === "admin"  && <Shield size={14} className="text-brand-light" />}
+                  {key === "wallet" && <Wallet size={14} />}
+                  {key === "portfolio" && <User size={14} />}
+                  {key === "markets" && <TrendingUp size={14} />}
+                  {key === "howItWorks" && <Globe size={14} />}
+                  {t(key as "markets" | "portfolio" | "wallet" | "howItWorks" | "admin")}
+                </Link>
+              ))}
+            </nav>
+
+            {/* Balance + Deposit at bottom (only when logged in) */}
+            {loggedIn && (
+              <div className="border-t border-border p-3 space-y-2">
+                <div className="rounded-lg bg-surface-2 px-3 py-2.5">
+                  <div className="text-[10px] text-slate-500 mb-0.5">Genetia · Available</div>
+                  {genetiaWalletLoading && !genetiaWallet ? (
+                    <Loader2 size={14} className="animate-spin text-slate-400" />
+                  ) : (
+                    <div className="text-base font-semibold text-white">${formatBalance(usdcBalance)}</div>
+                  )}
+                  {lockedBalance && parseFloat(lockedBalance) > 0 && (
+                    <div className="text-[11px] text-yellow-500 mt-0.5">${formatBalance(lockedBalance)} locked</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => { openDepositModal(); setMobileNavOpen(false); }}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark transition-colors"
+                >
+                  <ArrowDownToLine size={14} />
+                  {t("deposit")}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

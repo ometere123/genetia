@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   Zap, Shield, Globe, ArrowRight,
   LayoutGrid, LineChart, Brain, Banknote,
@@ -33,12 +33,12 @@ const STEPS: Array<{ n: string; title: string; desc: string; Icon: LucideIcon }>
 ];
 
 const COMPARE = [
-  { feature: "Resolution",   genetia: "GenLayer AI validators",     poly: "UMA token holders"    },
+  { feature: "Resolution",   genetia: "GenLayer validators",     poly: "UMA token holders"    },
   { feature: "Disputes",     genetia: "None - AI consensus",        poly: "Challenge periods"    },
   { feature: "Settlement",   genetia: "< 1 second (Arc)",           poly: "Hours (Polygon)"      },
   { feature: "Gas token",    genetia: "USDC (stable fees)",         poly: "MATIC (volatile)"     },
   { feature: "Finality",     genetia: "Deterministic",              poly: "Probabilistic"        },
-  { feature: "Resolution $", genetia: "< $1 per market",           poly: "$50–$500+ in UMA"     },
+  { feature: "Resolution $", genetia: "< $1 per market",           poly: "$50â€“$500+ in UMA"     },
 ];
 
 export default function AboutPage() {
@@ -54,7 +54,7 @@ export default function AboutPage() {
           How Genetia works
         </h1>
         <p className="text-slate-400 text-base leading-relaxed max-w-xl mx-auto">
-          Prediction markets with GenLayer AI resolution and Arc&apos;s USDC-native settlement - faster, cheaper, and smarter than anything that came before.
+          Prediction markets with GenLayer resolution and Arc&apos;s USDC-native settlement - faster, cheaper, and smarter than anything that came before.
         </p>
       </div>
 

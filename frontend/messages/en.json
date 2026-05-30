@@ -15,7 +15,7 @@
   },
   "home": {
     "title": "Prediction Markets",
-    "subtitle": "Trade YES/NO on real-world events. Settled in USDC on Arc, resolved by GenLayer AI validators.",
+    "subtitle": "Trade YES/NO on real-world events. Settled in USDC on Arc, resolved by GenLayer validators.",
     "newMarket": "New Market",
     "suggestMarket": "Suggest a Market",
     "markets": "market",
@@ -38,7 +38,7 @@
   "featured": {
     "live": "LIVE",
     "volume": "Volume",
-    "resolvedBy": "Resolved by GenLayer AI",
+    "resolvedBy": "Resolved by GenLayer",
     "settles": "Settles in USDC on Arc",
     "trade": "Trade"
   },
@@ -70,7 +70,7 @@
     "confirming": "Confirming…",
     "done": "Done!",
     "connectToTrade": "Connect to trade",
-    "disclaimer": "Trading on testnet. Parimutuel model — winners share the pool. Outcome resolved by GenLayer AI.",
+    "disclaimer": "Trading on testnet. Parimutuel model — winners share the pool. Outcome resolved by GenLayer.",
     "yourPositions": "Your positions"
   },
   "market": {
@@ -111,7 +111,7 @@
     "sources": "Data sources",
     "sourcesHint": "(GenLayer will fetch these)",
     "addSource": "Add source",
-    "infoHint": "GenLayer AI validators will fetch these URLs and use an LLM to determine the outcome. Be specific about dates, thresholds, and sources.",
+    "infoHint": "GenLayer validators will fetch these URLs and use an LLM to determine the outcome. Be specific about dates, thresholds, and sources.",
     "reviewInfo": "Creating this market will deploy a smart contract on Arc testnet. Gas is paid in USDC.",
     "created": "Market created!",
     "createdSub": "It will appear in the market list shortly.",
@@ -144,7 +144,7 @@
   "about": {
     "badge": "AI-resolved prediction markets",
     "title": "How Genetia works",
-    "subtitle": "Prediction markets with GenLayer AI resolution and Arc's USDC-native settlement — faster, cheaper, and smarter than anything that came before.",
+    "subtitle": "Prediction markets with GenLayer resolution and Arc's USDC-native settlement — faster, cheaper, and smarter than anything that came before.",
     "steps": [
       { "n": "01", "title": "Create a market", "desc": "Set a yes/no question, resolution date, and the criteria GenLayer's AI will use to determine the outcome. Anyone can create.", "icon": "📊" },
       { "n": "02", "title": "Trade YES or NO", "desc": "Buy shares with USDC on Arc. Price discovery happens in real-time as traders take positions. Arc settles every trade in under a second.", "icon": "💹" },
@@ -153,7 +153,7 @@
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "Resolution",   "genetia": "GenLayer AI validators",   "poly": "UMA token holders"   },
+      { "feature": "Resolution",   "genetia": "GenLayer validators",   "poly": "UMA token holders"   },
       { "feature": "Disputes",     "genetia": "None — AI consensus",      "poly": "Challenge periods"   },
       { "feature": "Settlement",   "genetia": "< 1 second (Arc)",         "poly": "Hours (Polygon)"     },
       { "feature": "Gas token",    "genetia": "USDC (stable fees)",       "poly": "MATIC (volatile)"    },

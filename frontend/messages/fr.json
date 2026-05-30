@@ -38,7 +38,7 @@
   "featured": {
     "live": "EN DIRECT",
     "volume": "Volume",
-    "resolvedBy": "Résolu par l'IA GenLayer",
+    "resolvedBy": "Résolu par GenLayer",
     "settles": "Réglé en USDC sur Arc",
     "trade": "Trader"
   },
@@ -70,7 +70,7 @@
     "confirming": "Confirmation…",
     "done": "Terminé !",
     "connectToTrade": "Connectez-vous pour trader",
-    "disclaimer": "Trading sur testnet. Modèle parimutel — les gagnants partagent le fonds. Résultat résolu par l'IA GenLayer.",
+    "disclaimer": "Trading sur testnet. Modèle parimutel — les gagnants partagent le fonds. Résultat résolu par GenLayer.",
     "yourPositions": "Vos positions"
   },
   "market": {
@@ -144,7 +144,7 @@
   "about": {
     "badge": "Marchés de prédiction résolus par IA",
     "title": "Comment Genetia fonctionne",
-    "subtitle": "Marchés de prédiction avec résolution IA GenLayer et règlement natif USDC sur Arc — plus rapide, moins cher et plus intelligent que tout ce qui existait.",
+    "subtitle": "Marchés de prédiction avec résolution GenLayer et règlement natif USDC sur Arc — plus rapide, moins cher et plus intelligent que tout ce qui existait.",
     "steps": [
       { "n": "01", "title": "Créez un marché", "desc": "Définissez une question oui/non, une date de résolution et les critères que l'IA de GenLayer utilisera pour déterminer le résultat. N'importe qui peut créer.", "icon": "📊" },
       { "n": "02", "title": "Tradez OUI ou NON", "desc": "Achetez des parts avec USDC sur Arc. La découverte des prix se fait en temps réel au fur et à mesure que les traders prennent des positions. Arc règle chaque transaction en moins d'une seconde.", "icon": "💹" },
@@ -153,7 +153,7 @@
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "Résolution",   "genetia": "Validateurs IA GenLayer",    "poly": "Détenteurs de tokens UMA"  },
+      { "feature": "Résolution",   "genetia": "Validateurs GenLayer",    "poly": "Détenteurs de tokens UMA"  },
       { "feature": "Litiges",      "genetia": "Aucun — consensus IA",       "poly": "Périodes de contestation"  },
       { "feature": "Règlement",    "genetia": "< 1 seconde (Arc)",          "poly": "Des heures (Polygon)"      },
       { "feature": "Token gaz",    "genetia": "USDC (frais stables)",       "poly": "MATIC (volatile)"          },

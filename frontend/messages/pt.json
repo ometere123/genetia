@@ -15,7 +15,7 @@
   },
   "home": {
     "title": "Mercados de Previsão",
-    "subtitle": "Negocie SIM/NÃO em eventos do mundo real. Liquidado em USDC na Arc, resolvido pelos validadores IA da GenLayer.",
+    "subtitle": "Negocie SIM/NÃO em eventos do mundo real. Liquidado em USDC na Arc, resolvido pelos validadores GenLayer.",
     "newMarket": "Novo Mercado",
     "suggestMarket": "Sugerir um Mercado",
     "markets": "mercado",
@@ -38,7 +38,7 @@
   "featured": {
     "live": "AO VIVO",
     "volume": "Volume",
-    "resolvedBy": "Resolvido por IA da GenLayer",
+    "resolvedBy": "Resolvido por GenLayer",
     "settles": "Liquidado em USDC na Arc",
     "trade": "Negociar"
   },
@@ -70,7 +70,7 @@
     "confirming": "Confirmando…",
     "done": "Pronto!",
     "connectToTrade": "Conecte-se para negociar",
-    "disclaimer": "Negociando na testnet. Modelo parimútuo — vencedores dividem o fundo. Resultado resolvido por IA da GenLayer.",
+    "disclaimer": "Negociando na testnet. Modelo parimútuo — vencedores dividem o fundo. Resultado resolvido por GenLayer.",
     "yourPositions": "Suas posições"
   },
   "market": {
@@ -111,7 +111,7 @@
     "sources": "Fontes de dados",
     "sourcesHint": "(GenLayer irá consultá-las)",
     "addSource": "Adicionar fonte",
-    "infoHint": "Os validadores IA da GenLayer irão buscar essas URLs e usar um LLM para determinar o resultado. Seja específico sobre datas, limites e fontes.",
+    "infoHint": "Os validadores GenLayer irão buscar essas URLs e usar um LLM para determinar o resultado. Seja específico sobre datas, limites e fontes.",
     "reviewInfo": "Criar este mercado irá implantar um contrato inteligente na testnet da Arc. O gás é pago em USDC.",
     "created": "Mercado criado!",
     "createdSub": "Ele aparecerá na lista de mercados em breve.",
@@ -144,16 +144,16 @@
   "about": {
     "badge": "Mercados de previsão resolvidos por IA",
     "title": "Como o Genetia funciona",
-    "subtitle": "Mercados de previsão com resolução IA da GenLayer e liquidação nativa em USDC na Arc — mais rápido, mais barato e mais inteligente do que qualquer coisa anterior.",
+    "subtitle": "Mercados de previsão com resolução GenLayer e liquidação nativa em USDC na Arc — mais rápido, mais barato e mais inteligente do que qualquer coisa anterior.",
     "steps": [
-      { "n": "01", "title": "Crie um mercado", "desc": "Defina uma pergunta sim/não, data de resolução e os critérios que a IA da GenLayer usará para determinar o resultado. Qualquer pessoa pode criar.", "icon": "📊" },
+      { "n": "01", "title": "Crie um mercado", "desc": "Defina uma pergunta sim/não, data de resolução e os critérios que a GenLayer usará para determinar o resultado. Qualquer pessoa pode criar.", "icon": "📊" },
       { "n": "02", "title": "Negocie SIM ou NÃO", "desc": "Compre cotas com USDC na Arc. A descoberta de preços acontece em tempo real enquanto os negociadores assumem posições. A Arc liquida cada negociação em menos de um segundo.", "icon": "💹" },
       { "n": "03", "title": "GenLayer resolve", "desc": "Quando o mercado fecha, um Contrato Inteligente da GenLayer busca dados ao vivo das fontes especificadas e usa um LLM para determinar o resultado via consenso de Democracia Otimista.", "icon": "🤖" },
       { "n": "04", "title": "Vencedores pagos instantaneamente", "desc": "O resultado é enviado para a Arc. Os vencedores reivindicam sua cota proporcional em USDC. Sem votação UMA, sem período de contestação — apenas liquidação atômica.", "icon": "💰" }
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "Resolução",    "genetia": "Validadores IA da GenLayer",  "poly": "Detentores de tokens UMA" },
+      { "feature": "Resolução",    "genetia": "Validadores GenLayer",  "poly": "Detentores de tokens UMA" },
       { "feature": "Disputas",     "genetia": "Nenhuma — consenso IA",       "poly": "Períodos de contestação"  },
       { "feature": "Liquidação",   "genetia": "< 1 segundo (Arc)",           "poly": "Horas (Polygon)"          },
       { "feature": "Token gás",    "genetia": "USDC (taxas estáveis)",       "poly": "MATIC (volátil)"          },

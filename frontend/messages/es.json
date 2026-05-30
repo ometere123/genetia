@@ -15,7 +15,7 @@
   },
   "home": {
     "title": "Mercados de Predicción",
-    "subtitle": "Opera SÍ/NO en eventos del mundo real. Liquidado en USDC en Arc, resuelto por los validadores IA de GenLayer.",
+    "subtitle": "Opera SÍ/NO en eventos del mundo real. Liquidado en USDC en Arc, resuelto por los validadores GenLayer.",
     "newMarket": "Nuevo Mercado",
     "suggestMarket": "Sugerir un Mercado",
     "markets": "mercado",
@@ -38,7 +38,7 @@
   "featured": {
     "live": "EN VIVO",
     "volume": "Volumen",
-    "resolvedBy": "Resuelto por IA de GenLayer",
+    "resolvedBy": "Resuelto por GenLayer",
     "settles": "Liquidado en USDC en Arc",
     "trade": "Operar"
   },
@@ -70,7 +70,7 @@
     "confirming": "Confirmando…",
     "done": "¡Listo!",
     "connectToTrade": "Conéctate para operar",
-    "disclaimer": "Operando en testnet. Modelo parimutual — los ganadores comparten el fondo. Resultado resuelto por IA de GenLayer.",
+    "disclaimer": "Operando en testnet. Modelo parimutual — los ganadores comparten el fondo. Resultado resuelto por GenLayer.",
     "yourPositions": "Tus posiciones"
   },
   "market": {
@@ -111,7 +111,7 @@
     "sources": "Fuentes de datos",
     "sourcesHint": "(GenLayer las consultará)",
     "addSource": "Añadir fuente",
-    "infoHint": "Los validadores IA de GenLayer consultarán estas URLs y usarán un LLM para determinar el resultado. Sé específico sobre fechas, umbrales y fuentes.",
+    "infoHint": "Los validadores GenLayer consultarán estas URLs y usarán un LLM para determinar el resultado. Sé específico sobre fechas, umbrales y fuentes.",
     "reviewInfo": "Crear este mercado desplegará un contrato inteligente en Arc testnet. El gas se paga en USDC.",
     "created": "¡Mercado creado!",
     "createdSub": "Aparecerá en la lista de mercados pronto.",
@@ -144,16 +144,16 @@
   "about": {
     "badge": "Mercados de predicción resueltos por IA",
     "title": "Cómo funciona Genetia",
-    "subtitle": "Mercados de predicción con resolución IA de GenLayer y liquidación nativa en USDC de Arc — más rápido, más barato y más inteligente que todo lo anterior.",
+    "subtitle": "Mercados de predicción con resolución GenLayer y liquidación nativa en USDC de Arc — más rápido, más barato y más inteligente que todo lo anterior.",
     "steps": [
-      { "n": "01", "title": "Crea un mercado", "desc": "Establece una pregunta sí/no, fecha de resolución y los criterios que usará la IA de GenLayer para determinar el resultado. Cualquiera puede crear.", "icon": "📊" },
+      { "n": "01", "title": "Crea un mercado", "desc": "Establece una pregunta sí/no, fecha de resolución y los criterios que usará la GenLayer para determinar el resultado. Cualquiera puede crear.", "icon": "📊" },
       { "n": "02", "title": "Opera SÍ o NO", "desc": "Compra acciones con USDC en Arc. El descubrimiento de precios ocurre en tiempo real mientras los operadores toman posiciones. Arc liquida cada operación en menos de un segundo.", "icon": "💹" },
       { "n": "03", "title": "GenLayer resuelve", "desc": "Cuando cierra el mercado, un Contrato Inteligente de GenLayer obtiene datos en vivo de las fuentes especificadas y usa un LLM para determinar el resultado mediante consenso de Democracia Optimista.", "icon": "🤖" },
       { "n": "04", "title": "Ganadores pagados al instante", "desc": "El resultado se lleva a Arc. Los ganadores reclaman su parte proporcional en USDC. Sin votación UMA, sin período de desafío — solo liquidación atómica.", "icon": "💰" }
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "Resolución",   "genetia": "Validadores IA de GenLayer",  "poly": "Poseedores de tokens UMA" },
+      { "feature": "Resolución",   "genetia": "Validadores GenLayer",  "poly": "Poseedores de tokens UMA" },
       { "feature": "Disputas",     "genetia": "Ninguna — consenso IA",       "poly": "Períodos de desafío"      },
       { "feature": "Liquidación",  "genetia": "< 1 segundo (Arc)",           "poly": "Horas (Polygon)"          },
       { "feature": "Gas token",    "genetia": "USDC (tarifas estables)",     "poly": "MATIC (volátil)"          },

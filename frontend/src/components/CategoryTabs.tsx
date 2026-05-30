@@ -8,7 +8,7 @@ import { categoryMeta, type CategoryId } from "../lib/category-icons";
 export type FilterStatus   = "all" | "open" | "resolved";
 export type FilterCategory = CategoryId;
 
-const CATEGORY_IDS = ["all", "crypto", "politics", "sports", "science", "entertainment", "other"] as const;
+const CATEGORY_IDS = ["all", "crypto", "politics", "sports", "science", "entertainment"] as const;
 
 interface CategoryTabsProps {
   activeCategory: FilterCategory;

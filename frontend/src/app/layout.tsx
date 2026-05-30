@@ -10,7 +10,7 @@ import Navbar from "../components/Navbar";
 export const metadata: Metadata = {
   title: "Genetia — Prediction Markets",
   description: "AI-resolved prediction markets on Arc, powered by GenLayer",
-  icons: { icon: "/favicon.ico" },
+  // favicon served automatically from app/icon.svg
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

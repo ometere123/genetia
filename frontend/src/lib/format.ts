@@ -24,7 +24,7 @@ export function shortAddr(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-export const CATEGORIES = ["crypto", "politics", "sports", "science", "entertainment", "other"] as const;
+export const CATEGORIES = ["crypto", "politics", "sports", "science", "entertainment"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 // ── Locale-aware formatting (Intl) ─────────────────────────────────────────

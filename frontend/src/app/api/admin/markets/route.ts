@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { Decimal } from "@/lib/decimal";
 import { runResolverTick } from "@/lib/resolver-pipeline";
+import { requireAdmin, adminErrorResponse } from "@/lib/admin-auth";
 
 const genlayerResolveSchema = z.object({
   marketId: z.string().min(1),
@@ -26,6 +27,7 @@ const refundSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAdmin(req);
     const body = await req.json();
     const { action } = body as { action?: string };
 
@@ -37,8 +39,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err) {
-    console.error("[admin/markets]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return adminErrorResponse(err);
   }
 }
 
@@ -202,6 +203,7 @@ async function handlePause(body: unknown) {
  */
 export async function GET(req: NextRequest) {
   try {
+    await requireAdmin(req);
     const lmsrStatusParam = req.nextUrl.searchParams.get("lmsrStatus");
     const lmsrStatuses = lmsrStatusParam ? lmsrStatusParam.split(",").map((s) => s.trim()) : null;
 
@@ -236,7 +238,6 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (err) {
-    console.error("[admin/markets GET]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return adminErrorResponse(err);
   }
 }

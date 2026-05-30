@@ -6,9 +6,11 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAdmin, adminErrorResponse } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   try {
+    await requireAdmin(req);
     const { searchParams } = req.nextUrl;
     const limit  = Math.min(parseInt(searchParams.get("limit") ?? "50"), 200);
     const offset = parseInt(searchParams.get("offset") ?? "0");
@@ -52,7 +54,6 @@ export async function GET(req: NextRequest) {
     const total = await prisma.user.count();
     return NextResponse.json({ users: shaped, total });
   } catch (err) {
-    console.error("[admin/users]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return adminErrorResponse(err);
   }
 }

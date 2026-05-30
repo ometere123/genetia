@@ -46,8 +46,8 @@
     "breaking": "突发新闻",
     "exploreAll": "探索全部 →",
     "hotTopics": "热门话题",
-    "aiResolved": "AI解析市场",
-    "aiResolvedDesc": "GenLayer验证者获取实时数据并达成共识以解析市场——无需UMA投票，无争议。"
+    "aiResolved": "GenLayer解析市场",
+    "aiResolvedDesc": "GenLayer验证者获取实时数据并达成共识以解析市场。"
   },
   "trading": {
     "placeATrade": "下单",

@@ -46,8 +46,8 @@
     "breaking": "Breaking",
     "exploreAll": "Explore all →",
     "hotTopics": "Hot topics",
-    "aiResolved": "AI-Resolved Markets",
-    "aiResolvedDesc": "GenLayer validators fetch live data and reach consensus to resolve markets — no UMA voting, no disputes."
+    "aiResolved": "GenLayer-Resolved Markets",
+    "aiResolvedDesc": "GenLayer validators fetch live data and reach consensus to resolve markets."
   },
   "trading": {
     "placeATrade": "Place a trade",

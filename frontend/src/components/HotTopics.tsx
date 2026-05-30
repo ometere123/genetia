@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { formatUsdc } from "../lib/format";
 import type { MarketData } from "./MarketCard";
@@ -87,8 +88,14 @@ export default function HotTopics({ markets }: HotTopicsProps) {
       {/* GenLayer badge */}
       <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4">
         <div className="flex items-start gap-3">
-          <div className="h-8 w-8 rounded-lg bg-brand/20 flex items-center justify-center shrink-0 mt-0.5">
-            <span className="text-sm">🤖</span>
+          <div className="h-8 w-8 rounded-lg bg-white/95 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+            <Image
+              src="/genlayer-logo.png"
+              alt="GenLayer"
+              width={28}
+              height={28}
+              className="object-contain"
+            />
           </div>
           <div>
             <p className="text-xs font-semibold text-brand-light mb-1">{t("aiResolved")}</p>

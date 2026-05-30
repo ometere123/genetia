@@ -99,9 +99,18 @@ export default function HomePage() {
 
   const filtered = markets;
 
-  const featured = [...markets]
-    .filter((m) => !m.resolved)
-    .sort((a, b) => Number(b.yesPool + b.noPool) - Number(a.yesPool + a.noPool))[0];
+  // The featured banner only renders for the unfiltered "All / not resolved"
+  // view. Picking a featured candidate when we're in a category-filtered view
+  // and then quietly excluding it from the grid is what made "2 markets" only
+  // render one card. So compute `featured` only when it's actually going to
+  // be shown.
+  const showFeatured = filterCat === "all" && filterStatus !== "resolved";
+
+  const featured = showFeatured
+    ? [...markets]
+        .filter((m) => !m.resolved)
+        .sort((a, b) => Number(b.yesPool + b.noPool) - Number(a.yesPool + a.noPool))[0]
+    : undefined;
 
   const gridMarkets = featured
     ? filtered.filter((m) => m.address !== featured.address)
@@ -120,7 +129,7 @@ export default function HomePage() {
         <div className="flex gap-6">
           {/* Main */}
           <div className="flex-1 min-w-0 space-y-6">
-            {!isLoading && featured && filterCat === "all" && filterStatus !== "resolved" && (
+            {!isLoading && featured && (
               <FeaturedMarket market={featured} />
             )}
 

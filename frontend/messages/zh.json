@@ -15,7 +15,7 @@
   },
   "home": {
     "title": "预测市场",
-    "subtitle": "在现实事件上交易是/否。在Arc上以USDC结算，由GenLayer AI验证者解析。",
+    "subtitle": "在现实事件上交易是/否。在Arc上以USDC结算，由GenLayer验证者解析。",
     "newMarket": "新建市场",
     "suggestMarket": "建议市场",
     "markets": "个市场",
@@ -38,7 +38,7 @@
   "featured": {
     "live": "直播",
     "volume": "交易量",
-    "resolvedBy": "由GenLayer AI解析",
+    "resolvedBy": "由GenLayer解析",
     "settles": "在Arc上以USDC结算",
     "trade": "交易"
   },
@@ -70,7 +70,7 @@
     "confirming": "确认中…",
     "done": "完成！",
     "connectToTrade": "连接以交易",
-    "disclaimer": "在测试网交易。彩池模式——获胜者瓜分资金池。结果由GenLayer AI解析。",
+    "disclaimer": "在测试网交易。彩池模式——获胜者瓜分资金池。结果由GenLayer解析。",
     "yourPositions": "您的持仓"
   },
   "market": {
@@ -111,7 +111,7 @@
     "sources": "数据来源",
     "sourcesHint": "（GenLayer将获取这些页面）",
     "addSource": "添加来源",
-    "infoHint": "GenLayer AI验证者将获取这些URL并使用LLM确定结果。请具体说明日期、阈值和来源。",
+    "infoHint": "GenLayer验证者将获取这些URL并使用LLM确定结果。请具体说明日期、阈值和来源。",
     "reviewInfo": "创建此市场将在Arc测试网上部署智能合约。Gas费以USDC支付。",
     "created": "市场已创建！",
     "createdSub": "它将很快出现在市场列表中。",
@@ -144,16 +144,16 @@
   "about": {
     "badge": "AI解析预测市场",
     "title": "Genetia如何运作",
-    "subtitle": "基于GenLayer AI解析和Arc USDC原生结算的预测市场——比以往任何产品都更快、更便宜、更智能。",
+    "subtitle": "基于GenLayer解析和Arc USDC原生结算的预测市场——比以往任何产品都更快、更便宜、更智能。",
     "steps": [
-      { "n": "01", "title": "创建市场", "desc": "设置是/否问题、解析日期以及GenLayer AI将用于确定结果的标准。任何人都可以创建。", "icon": "📊" },
+      { "n": "01", "title": "创建市场", "desc": "设置是/否问题、解析日期以及GenLayer将用于确定结果的标准。任何人都可以创建。", "icon": "📊" },
       { "n": "02", "title": "交易是或否", "desc": "在Arc上用USDC购买份额。随着交易者建立仓位，价格发现实时发生。Arc在不到一秒内完成每笔交易结算。", "icon": "💹" },
       { "n": "03", "title": "GenLayer解析", "desc": "市场关闭时，GenLayer智能合约从指定来源获取实时数据，并使用LLM通过乐观民主共识确定结果。", "icon": "🤖" },
       { "n": "04", "title": "即时支付获胜者", "desc": "结果桥接到Arc。获胜者按比例领取USDC份额。无需UMA投票，无挑战期——仅原子结算。", "icon": "💰" }
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "解析方式",  "genetia": "GenLayer AI验证者",    "poly": "UMA代币持有者"  },
+      { "feature": "解析方式",  "genetia": "GenLayer验证者",    "poly": "UMA代币持有者"  },
       { "feature": "争议",     "genetia": "无——AI共识",           "poly": "挑战期"         },
       { "feature": "结算",     "genetia": "< 1秒 (Arc)",          "poly": "数小时 (Polygon)" },
       { "feature": "Gas代币",  "genetia": "USDC（稳定费用）",     "poly": "MATIC（波动）"   },

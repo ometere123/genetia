@@ -132,7 +132,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </div>
           )}
 
-          {/* Step 0 â€" Market details */}
+          {/* Step 0 — Market details */}
           {step === 0 && (
             <>
               <div>
@@ -156,7 +156,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Short context for users browsing the markets listâ€¦"
+                  placeholder="Short context for users browsing the markets list…"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   maxLength={2000}
@@ -197,7 +197,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </>
           )}
 
-          {/* Step 1 â€" Resolution */}
+          {/* Step 1 — Resolution */}
           {step === 1 && (
             <>
               <div>
@@ -255,7 +255,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </>
           )}
 
-          {/* Step 2 â€" Review */}
+          {/* Step 2 — Review */}
           {step === 2 && (
             <div className="space-y-3">
               {[

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatUsdc, timeUntil } from "../lib/format";
 import type { MarketData } from "./MarketCard";
 import { ArrowUpRight, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 import clsx from "clsx";
 
 interface FeaturedMarketProps {
@@ -55,6 +56,8 @@ function generateSparkPoints(end: number): number[] {
 }
 
 export default function FeaturedMarket({ market }: FeaturedMarketProps) {
+  const t      = useTranslations("featured");
+  const tm     = useTranslations("marketCard");
   const total  = market.yesPool + market.noPool;
   const yesPct = Number(market.yesProbBps) / 100;
   const noPct  = 100 - yesPct;
@@ -71,7 +74,7 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
             <div className="flex items-center gap-2 mb-3">
               <span className="flex items-center gap-1 text-xs font-medium text-yes">
                 <span className="h-1.5 w-1.5 rounded-full bg-yes live-dot" />
-                LIVE
+                {t("live")}
               </span>
               <span className="text-xs text-slate-500">Â·</span>
               <span className="text-xs text-slate-500 capitalize">{market.category}</span>
@@ -87,19 +90,19 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
             <div className="flex gap-3 mb-5">
               <div className="flex items-center gap-3 rounded-xl border border-yes/25 bg-yes/5 px-4 py-3">
                 <div>
-                  <p className="text-[11px] text-slate-400 mb-0.5">Yes</p>
+                  <p className="text-[11px] text-slate-400 mb-0.5">{tm("yes")}</p>
                   <p className="text-2xl font-bold text-yes leading-none">{yesPct.toFixed(1)}%</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-xl border border-no/25 bg-no/5 px-4 py-3">
                 <div>
-                  <p className="text-[11px] text-slate-400 mb-0.5">No</p>
+                  <p className="text-[11px] text-slate-400 mb-0.5">{tm("no")}</p>
                   <p className="text-2xl font-bold text-no leading-none">{noPct.toFixed(1)}%</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">
                 <div>
-                  <p className="text-[11px] text-slate-400 mb-0.5">Volume</p>
+                  <p className="text-[11px] text-slate-400 mb-0.5">{t("volume")}</p>
                   <p className="text-lg font-bold text-white leading-none">${formatUsdc(total)}</p>
                 </div>
               </div>
@@ -114,9 +117,9 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span className="flex items-center gap-1">
                 <Zap size={11} className="text-brand-light" />
-                Resolved by GenLayer
+                {t("resolvedBy")}
               </span>
-              <span>Settles in USDC on Arc</span>
+              <span>{t("settles")}</span>
             </div>
           </div>
 
@@ -126,7 +129,7 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
               <ProbSparkline yesPct={yesPct} />
             </div>
             <div className="flex items-center gap-1 text-sm font-medium text-brand-light group-hover:gap-2 transition-all">
-              Trade
+              {t("trade")}
               <ArrowUpRight size={16} />
             </div>
           </div>

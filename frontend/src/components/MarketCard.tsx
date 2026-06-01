@@ -13,6 +13,7 @@ export interface MarketData {
   endDate: bigint;
   yesPool: bigint;
   noPool: bigint;
+  usdcVolume: number;   // actual USDC traded (sum of buy amounts)
   resolved: boolean;
   outcome: boolean;
   yesProbBps: bigint;
@@ -32,13 +33,12 @@ function timeUntilLocal(unix: bigint, t: ReturnType<typeof useTranslations<"time
 
 export default function MarketCard({
   address, question, category, endDate,
-  yesPool, noPool, resolved, outcome, yesProbBps,
+  usdcVolume, resolved, outcome, yesProbBps,
 }: MarketData) {
   const t     = useTranslations("marketCard");
   const tTime = useTranslations("time");
   const tCats = useTranslations("categories");
 
-  const total  = yesPool + noPool;
   const yesPct = Number(yesProbBps) / 100;
   const noPct  = 100 - yesPct;
   const meta   = categoryMeta(category);
@@ -112,7 +112,7 @@ export default function MarketCard({
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-border mt-2">
-          <span className="text-[11px] text-slate-500">${formatUsdc(total)} {t("volume")}</span>
+          <span className="text-[11px] text-slate-500">${usdcVolume.toFixed(2)} {t("volume")}</span>
           <span className="text-[11px] text-slate-600 group-hover:text-slate-400 transition-colors font-medium">
             {t("trade")} →
           </span>

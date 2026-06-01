@@ -58,7 +58,6 @@ function generateSparkPoints(end: number): number[] {
 export default function FeaturedMarket({ market }: FeaturedMarketProps) {
   const t      = useTranslations("featured");
   const tm     = useTranslations("marketCard");
-  const total  = market.yesPool + market.noPool;
   const yesPct = Number(market.yesProbBps) / 100;
   const noPct  = 100 - yesPct;
 
@@ -103,7 +102,7 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3">
                 <div>
                   <p className="text-[11px] text-slate-400 mb-0.5">{t("volume")}</p>
-                  <p className="text-lg font-bold text-white leading-none">${formatUsdc(total)}</p>
+                  <p className="text-lg font-bold text-white leading-none">${market.usdcVolume.toFixed(2)}</p>
                 </div>
               </div>
             </div>

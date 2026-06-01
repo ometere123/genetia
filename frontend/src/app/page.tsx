@@ -49,6 +49,7 @@ interface DBMarket {
   yesPool: string;
   noPool: string;
   lmsrB: string | null;
+  usdcVolume: string;
   arcAddress: string | null;
   settlement?: { resolution: string | null } | null;
 }
@@ -87,6 +88,7 @@ function dbToMarketData(m: DBMarket): MarketData {
     endDate:    BigInt(Math.floor(new Date(m.expiry).getTime() / 1000)),
     yesPool,
     noPool,
+    usdcVolume: parseFloat(m.usdcVolume) || 0,
     resolved:   m.status === "resolved",
     outcome:    m.settlement?.resolution === "YES",
     yesProbBps: lmsrProbBps(qYes, qNo, b),

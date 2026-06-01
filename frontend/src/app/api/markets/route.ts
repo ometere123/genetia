@@ -46,25 +46,39 @@ export async function GET(req: NextRequest) {
       ...(q ? { title: { contains: q, mode: "insensitive" as const } } : {}),
     };
 
-    const markets = await prisma.market.findMany({
-      where: whereClause,
-      include: {
-        // `_count.bets` is the on-chain trade count for LMSR markets (we
-        // re-use the Bet column name in the response for backwards-compat
-        // with the UI, but the source is `arcTrades`).
-        _count: { select: { arcTrades: true } },
-        settlement: {
-          select: { resolution: true, reasoning: true, confidence: true, settledAt: true },
+    const [markets, total] = await Promise.all([
+      prisma.market.findMany({
+        where: whereClause,
+        include: {
+          _count: { select: { arcTrades: true } },
+          settlement: {
+            select: { resolution: true, reasoning: true, confidence: true, settledAt: true },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-      skip: offset,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.market.count({ where: whereClause }),
+    ]);
+
+    // Aggregate actual USDC volume (sum of buy amounts) per market.
+    const marketIds = markets.map((m) => m.id);
+    const volumeRows = await prisma.arcTrade.groupBy({
+      by: ["marketId"],
+      where: { marketId: { in: marketIds }, action: "buy" },
+      _sum: { amount: true },
     });
+    const volumeMap = Object.fromEntries(
+      volumeRows.map((r) => [r.marketId, r._sum.amount?.toString() ?? "0"])
+    );
 
-    const total = await prisma.market.count({ where: whereClause });
+    const shaped = markets.map((m) => ({
+      ...m,
+      usdcVolume: volumeMap[m.id] ?? "0",
+    }));
 
-    return NextResponse.json({ markets, total });
+    return NextResponse.json({ markets: shaped, total });
   } catch (err) {
     console.error("[markets GET]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

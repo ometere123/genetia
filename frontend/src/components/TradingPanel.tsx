@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, AlertCircle, ArrowDownUp, Wallet, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTranslations } from "next-intl";
 import { usePlaceBet, useExitBet, useClaim } from "../hooks/useCircleWallet";
 import {
   priceAsFloat,
@@ -63,6 +64,7 @@ function fmtPct(p: number): string {
 
 export default function TradingPanel({ market }: { market: MarketInfo }) {
   const { isConnected, balance, login, openDepositModal } = useAuth();
+  const t = useTranslations("trading");
   const { placeBet, isPending: buyPending, error: buyError, reset: resetBuy } = usePlaceBet();
   const { exitBet, isPending: sellPending, error: sellError, reset: resetSell } = useExitBet();
   const { claim, isPending: claimPending, error: claimError, reset: resetClaim } = useClaim();
@@ -169,7 +171,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
     return (
       <div className="rounded-2xl border border-border bg-surface-1 overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-semibold text-white">Market resolved</h3>
+          <h3 className="text-sm font-semibold text-white">{t("marketResolved")}</h3>
         </div>
         <div className="p-5 space-y-4">
           <div className={clsx(
@@ -186,7 +188,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
             )}>
               {resolution ?? "INVALID"}
             </p>
-            <p className="text-xs text-slate-500">final outcome</p>
+            <p className="text-xs text-slate-500">{t("finalOutcome")}</p>
           </div>
 
           {isConnected ? (
@@ -196,20 +198,20 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
               className="w-full rounded-xl bg-primary-500 hover:bg-primary-400 disabled:opacity-50 text-white text-sm font-semibold py-3"
             >
               {claimPending ? <Loader2 size={14} className="inline animate-spin mr-2" /> : null}
-              Redeem outcome tokens
+              {t("redeemTokens")}
             </button>
           ) : (
             <button
               onClick={login}
               className="w-full rounded-xl bg-primary-500 hover:bg-primary-400 text-white text-sm font-semibold py-3"
             >
-              Connect to redeem
+              {t("connectToRedeem")}
             </button>
           )}
 
           {claimError && <ErrorBanner msg={claimError} />}
           {submittedTxId && (
-            <PendingTxBanner txId={submittedTxId} label="Redemption submitted" />
+            <PendingTxBanner txId={submittedTxId} label={t("redemptionSubmitted")} />
           )}
         </div>
       </div>
@@ -223,7 +225,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
       <div className="rounded-2xl border border-border bg-surface-1 overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-white">
-            {disputed ? "Resolution disputed" : "Resolution pending"}
+            {disputed ? t("resolutionDisputed") : t("resolutionPending")}
           </h3>
         </div>
         <div className="p-5 space-y-3 text-sm text-slate-300">
@@ -262,7 +264,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
               mode === m ? "bg-surface-2 text-white" : "text-slate-500 hover:text-slate-300"
             )}
           >
-            {m === "buy" ? "Buy" : "Sell / Cash out"}
+            {m === "buy" ? t("placeATrade") : t("sell")}
           </button>
         ))}
       </div>
@@ -348,7 +350,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
             onClick={login}
             className="w-full rounded-xl bg-primary-500 hover:bg-primary-400 text-white text-sm font-semibold py-3"
           >
-            Connect to trade
+            {t("connectToTrade")}
           </button>
         ) : mode === "buy" ? (
           needsDeposit ? (
@@ -356,7 +358,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
               onClick={openDepositModal}
               className="w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 text-white text-sm font-semibold py-3 flex items-center justify-center gap-2"
             >
-              <Wallet size={14} /> Deposit USDC to buy
+              <Wallet size={14} /> {t("depositToBuy")}
             </button>
           ) : (
             <button
@@ -370,7 +372,7 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
               )}
             >
               {buyPending && <Loader2 size={14} className="animate-spin" />}
-              Buy {side}
+              {t("buy", { side })}
             </button>
           )
         ) : (
@@ -380,12 +382,12 @@ export default function TradingPanel({ market }: { market: MarketInfo }) {
             className="w-full rounded-xl bg-surface-3 hover:bg-surface-4 text-white text-sm font-semibold py-3 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {sellPending && <Loader2 size={14} className="animate-spin" />}
-            <ArrowDownUp size={14} /> Sell {side} shares
+            <ArrowDownUp size={14} /> {t("sellShares", { side })}
           </button>
         )}
 
         {(buyError || sellError) && <ErrorBanner msg={buyError || sellError!} />}
-        {submittedTxId && <PendingTxBanner txId={submittedTxId} label="Tx submitted to Arc" />}
+        {submittedTxId && <PendingTxBanner txId={submittedTxId} label={t("txSubmitted")} />}
       </div>
     </div>
   );

@@ -2,9 +2,11 @@
 
 import { X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTranslations } from "next-intl";
 
 export default function AuthModal() {
   const { login, closeDepositModal } = useAuth();
+  const t = useTranslations("auth");
 
   return (
     <div
@@ -14,8 +16,8 @@ export default function AuthModal() {
       <div className="w-full max-w-sm rounded-2xl border border-border bg-surface-1 shadow-2xl shadow-black/60 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <div>
-            <h2 className="font-bold text-white text-base">Welcome to Genetia</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Sign in to trade and track your positions</p>
+            <h2 className="font-bold text-white text-base">{t("title")}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{t("subtitle")}</p>
           </div>
           <button
             onClick={closeDepositModal}
@@ -29,7 +31,7 @@ export default function AuthModal() {
             onClick={login}
             className="w-full rounded-xl bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-dark transition-all shadow-lg shadow-brand/20"
           >
-            Sign in with Privy
+            {t("signInWithPrivy")}
           </button>
         </div>
       </div>

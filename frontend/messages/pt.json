@@ -71,7 +71,16 @@
     "done": "Pronto!",
     "connectToTrade": "Conecte-se para negociar",
     "disclaimer": "Negociando na testnet. Modelo parimútuo — vencedores dividem o fundo. Resultado resolvido por GenLayer.",
-    "yourPositions": "Suas posições"
+    "yourPositions": "Suas posições",
+    "sell": "Vender / Sacar",
+    "sellShares": "Vender cotas {side}",
+    "redeemTokens": "Resgatar tokens",
+    "connectToRedeem": "Conectar para resgatar",
+    "resolutionDisputed": "Resolução disputada",
+    "resolutionPending": "Resolução pendente",
+    "depositToBuy": "Depositar USDC para comprar",
+    "txSubmitted": "Tx enviada para Arc",
+    "redemptionSubmitted": "Resgate enviado"
   },
   "market": {
     "allMarkets": "Todos os mercados",
@@ -98,7 +107,11 @@
   "create": {
     "title": "Criar um mercado",
     "step": "Passo {current} de {total}",
-    "steps": ["Detalhes do mercado", "Resolução", "Revisão"],
+    "steps": [
+      "Detalhes do mercado",
+      "Resolução",
+      "Revisão"
+    ],
     "question": "Pergunta do mercado",
     "questionRequired": "Pergunta do mercado *",
     "questionPlaceholder": "O ETH vai superar $10.000 antes do final de 2026?",
@@ -119,7 +132,24 @@
     "back": "Voltar",
     "next": "Próximo",
     "creating": "Criando…",
-    "create": "Criar Mercado"
+    "create": "Criar Mercado",
+    "suggest": "Sugerir um mercado",
+    "description": "Descrição",
+    "optional": "(opcional)",
+    "signInRequired": "Você precisa estar conectado para sugerir um mercado.",
+    "signIn": "Entrar →",
+    "criteriaHint": "seja específico sobre datas, limites e critérios de desempate",
+    "queueInfo": "Sua sugestão será adicionada à fila de revisão do admin. Se aprovada, será publicada como mercado real.",
+    "submit": "Enviar sugestão",
+    "submitting": "Enviando…",
+    "submitted": "Enviado!",
+    "successMsg": "Sugestão enviada! Um admin irá revisá-la em breve.",
+    "reviewQuestion": "Pergunta",
+    "reviewCategory": "Categoria",
+    "reviewCloses": "Fecha em",
+    "reviewCriteria": "Critérios",
+    "reviewSources": "Fontes",
+    "reviewNone": "Nenhuma"
   },
   "portfolio": {
     "connectTitle": "Conecte sua carteira",
@@ -146,25 +176,78 @@
     "title": "Como o Genetia funciona",
     "subtitle": "Mercados de previsão com resolução GenLayer e liquidação nativa em USDC na Arc — mais rápido, mais barato e mais inteligente do que qualquer coisa anterior.",
     "steps": [
-      { "n": "01", "title": "Crie um mercado", "desc": "Defina uma pergunta sim/não, data de resolução e os critérios que a GenLayer usará para determinar o resultado. Qualquer pessoa pode criar.", "icon": "📊" },
-      { "n": "02", "title": "Negocie SIM ou NÃO", "desc": "Compre cotas com USDC na Arc. A descoberta de preços acontece em tempo real enquanto os negociadores assumem posições. A Arc liquida cada negociação em menos de um segundo.", "icon": "💹" },
-      { "n": "03", "title": "GenLayer resolve", "desc": "Quando o mercado fecha, um Contrato Inteligente da GenLayer busca dados ao vivo das fontes especificadas e usa um LLM para determinar o resultado via consenso de Democracia Otimista.", "icon": "🤖" },
-      { "n": "04", "title": "Vencedores pagos instantaneamente", "desc": "O resultado é enviado para a Arc. Os vencedores reivindicam sua cota proporcional em USDC. Sem votação UMA, sem período de contestação — apenas liquidação atômica.", "icon": "💰" }
+      {
+        "n": "01",
+        "title": "Crie um mercado",
+        "desc": "Defina uma pergunta sim/não, data de resolução e os critérios que a GenLayer usará para determinar o resultado. Qualquer pessoa pode criar.",
+        "icon": "📊"
+      },
+      {
+        "n": "02",
+        "title": "Negocie SIM ou NÃO",
+        "desc": "Compre cotas com USDC na Arc. A descoberta de preços acontece em tempo real enquanto os negociadores assumem posições. A Arc liquida cada negociação em menos de um segundo.",
+        "icon": "💹"
+      },
+      {
+        "n": "03",
+        "title": "GenLayer resolve",
+        "desc": "Quando o mercado fecha, um Contrato Inteligente da GenLayer busca dados ao vivo das fontes especificadas e usa um LLM para determinar o resultado via consenso de Democracia Otimista.",
+        "icon": "🤖"
+      },
+      {
+        "n": "04",
+        "title": "Vencedores pagos instantaneamente",
+        "desc": "O resultado é enviado para a Arc. Os vencedores reivindicam sua cota proporcional em USDC. Sem votação UMA, sem período de contestação — apenas liquidação atômica.",
+        "icon": "💰"
+      }
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "Resolução",    "genetia": "Validadores GenLayer",  "poly": "Detentores de tokens UMA" },
-      { "feature": "Disputas",     "genetia": "Nenhuma — consenso IA",       "poly": "Períodos de contestação"  },
-      { "feature": "Liquidação",   "genetia": "< 1 segundo (Arc)",           "poly": "Horas (Polygon)"          },
-      { "feature": "Token gás",    "genetia": "USDC (taxas estáveis)",       "poly": "MATIC (volátil)"          },
-      { "feature": "Finalidade",   "genetia": "Determinista",                "poly": "Probabilística"           },
-      { "feature": "Custo resol.", "genetia": "< $1 por mercado",           "poly": "$50–$500+ em UMA"         }
+      {
+        "feature": "Resolução",
+        "genetia": "Validadores GenLayer",
+        "poly": "Detentores de tokens UMA"
+      },
+      {
+        "feature": "Disputas",
+        "genetia": "Nenhuma — consenso IA",
+        "poly": "Períodos de contestação"
+      },
+      {
+        "feature": "Liquidação",
+        "genetia": "< 1 segundo (Arc)",
+        "poly": "Horas (Polygon)"
+      },
+      {
+        "feature": "Token gás",
+        "genetia": "USDC (taxas estáveis)",
+        "poly": "MATIC (volátil)"
+      },
+      {
+        "feature": "Finalidade",
+        "genetia": "Determinista",
+        "poly": "Probabilística"
+      },
+      {
+        "feature": "Custo resol.",
+        "genetia": "< $1 por mercado",
+        "poly": "$50–$500+ em UMA"
+      }
     ],
     "stackTitle": "Tecnologia",
     "stack": [
-      { "title": "Arc Network",  "desc": "L1 compatível com EVM. Gás nativo em USDC. Finalidade determinista <1s. +30k TPS." },
-      { "title": "GenLayer",     "desc": "Contratos Inteligentes Python. Busca dados web ao vivo. Consenso LLM via Democracia Otimista." },
-      { "title": "Segurança",    "desc": "Fundo parimútuo. Taxa de 2%. Ponte de resolução confiável (atualização multisig planejada)." }
+      {
+        "title": "Arc Network",
+        "desc": "L1 compatível com EVM. Gás nativo em USDC. Finalidade determinista <1s. +30k TPS."
+      },
+      {
+        "title": "GenLayer",
+        "desc": "Contratos Inteligentes Python. Busca dados web ao vivo. Consenso LLM via Democracia Otimista."
+      },
+      {
+        "title": "Segurança",
+        "desc": "Fundo parimútuo. Taxa de 2%. Ponte de resolução confiável (atualização multisig planejada)."
+      }
     ],
     "exploreMarkets": "Explorar mercados"
   },
@@ -200,7 +283,8 @@
     "magicNotConfigured": "O login por e-mail requer uma chave Magic API. Adicione NEXT_PUBLIC_MAGIC_API_KEY ao .env.local.",
     "connectMetaMask": "Conectar MetaMask",
     "walletNote": "Certifique-se de que sua carteira está na Arc Testnet (ID de cadeia: 5042002).",
-    "magicNote": "Sem custódia — só você controla suas chaves."
+    "magicNote": "Sem custódia — só você controla suas chaves.",
+    "signInWithPrivy": "Entrar com Privy"
   },
   "deposit": {
     "title": "Adicionar Fundos",
@@ -214,7 +298,16 @@
     "copy": "Copiar",
     "copied": "Copiado!",
     "warning": "Envie apenas USDC na Arc Testnet para este endereço. Enviar em outras redes resultará em perda permanente.",
-    "faucet": "Obter USDC de teste do Faucet da Circle"
+    "faucet": "Obter USDC de teste do Faucet da Circle",
+    "depositTitle": "Depositar na Carteira Genetia",
+    "depositSubtitle": "Envie USDC para o endereço da sua Carteira Genetia para financiar sua conta.",
+    "walletType": "Tipo de carteira",
+    "networkLabel": "Rede",
+    "tokenLabel": "Token",
+    "availableBalance": "Saldo disponível",
+    "lockedInBets": "Bloqueado em apostas",
+    "provisioning": "Provisionando sua Carteira Genetia…",
+    "notProvisioned": "Carteira não provisionada. Entre para criar sua Carteira Genetia."
   },
   "admin": {
     "title": "Painel de Administração",

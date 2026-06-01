@@ -71,7 +71,16 @@
     "done": "完成！",
     "connectToTrade": "连接以交易",
     "disclaimer": "在测试网交易。彩池模式——获胜者瓜分资金池。结果由GenLayer解析。",
-    "yourPositions": "您的持仓"
+    "yourPositions": "您的持仓",
+    "sell": "卖出 / 套现",
+    "sellShares": "卖出 {side} 份额",
+    "redeemTokens": "赎回代币",
+    "connectToRedeem": "连接以赎回",
+    "resolutionDisputed": "解析争议中",
+    "resolutionPending": "解析待定",
+    "depositToBuy": "充值USDC以购买",
+    "txSubmitted": "交易已提交至Arc",
+    "redemptionSubmitted": "赎回已提交"
   },
   "market": {
     "allMarkets": "全部市场",
@@ -98,7 +107,11 @@
   "create": {
     "title": "创建市场",
     "step": "第 {current} 步，共 {total} 步",
-    "steps": ["市场详情", "解析", "确认"],
+    "steps": [
+      "市场详情",
+      "解析",
+      "确认"
+    ],
     "question": "市场问题",
     "questionRequired": "市场问题 *",
     "questionPlaceholder": "ETH会在2026年底前突破10,000美元吗？",
@@ -119,7 +132,24 @@
     "back": "返回",
     "next": "下一步",
     "creating": "创建中…",
-    "create": "创建市场"
+    "create": "创建市场",
+    "suggest": "建议市场",
+    "description": "描述",
+    "optional": "（可选）",
+    "signInRequired": "您需要登录才能建议市场。",
+    "signIn": "登录 →",
+    "criteriaHint": "请具体说明日期、阈值和平局处理规则",
+    "queueInfo": "您的建议将添加到管理员审核队列。如获批准，将作为真实市场上线并通知您。",
+    "submit": "提交建议",
+    "submitting": "提交中…",
+    "submitted": "已提交！",
+    "successMsg": "建议已提交！管理员将很快审核。",
+    "reviewQuestion": "问题",
+    "reviewCategory": "类别",
+    "reviewCloses": "截止时间",
+    "reviewCriteria": "标准",
+    "reviewSources": "来源",
+    "reviewNone": "无"
   },
   "portfolio": {
     "connectTitle": "连接您的钱包",
@@ -146,25 +176,78 @@
     "title": "Genetia如何运作",
     "subtitle": "基于GenLayer解析和Arc USDC原生结算的预测市场——比以往任何产品都更快、更便宜、更智能。",
     "steps": [
-      { "n": "01", "title": "创建市场", "desc": "设置是/否问题、解析日期以及GenLayer将用于确定结果的标准。任何人都可以创建。", "icon": "📊" },
-      { "n": "02", "title": "交易是或否", "desc": "在Arc上用USDC购买份额。随着交易者建立仓位，价格发现实时发生。Arc在不到一秒内完成每笔交易结算。", "icon": "💹" },
-      { "n": "03", "title": "GenLayer解析", "desc": "市场关闭时，GenLayer智能合约从指定来源获取实时数据，并使用LLM通过乐观民主共识确定结果。", "icon": "🤖" },
-      { "n": "04", "title": "即时支付获胜者", "desc": "结果桥接到Arc。获胜者按比例领取USDC份额。无需UMA投票，无挑战期——仅原子结算。", "icon": "💰" }
+      {
+        "n": "01",
+        "title": "创建市场",
+        "desc": "设置是/否问题、解析日期以及GenLayer将用于确定结果的标准。任何人都可以创建。",
+        "icon": "📊"
+      },
+      {
+        "n": "02",
+        "title": "交易是或否",
+        "desc": "在Arc上用USDC购买份额。随着交易者建立仓位，价格发现实时发生。Arc在不到一秒内完成每笔交易结算。",
+        "icon": "💹"
+      },
+      {
+        "n": "03",
+        "title": "GenLayer解析",
+        "desc": "市场关闭时，GenLayer智能合约从指定来源获取实时数据，并使用LLM通过乐观民主共识确定结果。",
+        "icon": "🤖"
+      },
+      {
+        "n": "04",
+        "title": "即时支付获胜者",
+        "desc": "结果桥接到Arc。获胜者按比例领取USDC份额。无需UMA投票，无挑战期——仅原子结算。",
+        "icon": "💰"
+      }
     ],
     "compareTitle": "Genetia vs. Polymarket",
     "features": [
-      { "feature": "解析方式",  "genetia": "GenLayer验证者",    "poly": "UMA代币持有者"  },
-      { "feature": "争议",     "genetia": "无——AI共识",           "poly": "挑战期"         },
-      { "feature": "结算",     "genetia": "< 1秒 (Arc)",          "poly": "数小时 (Polygon)" },
-      { "feature": "Gas代币",  "genetia": "USDC（稳定费用）",     "poly": "MATIC（波动）"   },
-      { "feature": "终结性",   "genetia": "确定性",               "poly": "概率性"          },
-      { "feature": "解析成本", "genetia": "每市场 < $1",          "poly": "$50–$500+ UMA"  }
+      {
+        "feature": "解析方式",
+        "genetia": "GenLayer验证者",
+        "poly": "UMA代币持有者"
+      },
+      {
+        "feature": "争议",
+        "genetia": "无——AI共识",
+        "poly": "挑战期"
+      },
+      {
+        "feature": "结算",
+        "genetia": "< 1秒 (Arc)",
+        "poly": "数小时 (Polygon)"
+      },
+      {
+        "feature": "Gas代币",
+        "genetia": "USDC（稳定费用）",
+        "poly": "MATIC（波动）"
+      },
+      {
+        "feature": "终结性",
+        "genetia": "确定性",
+        "poly": "概率性"
+      },
+      {
+        "feature": "解析成本",
+        "genetia": "每市场 < $1",
+        "poly": "$50–$500+ UMA"
+      }
     ],
     "stackTitle": "技术栈",
     "stack": [
-      { "title": "Arc Network", "desc": "EVM兼容L1。USDC原生Gas。确定性终结性<1秒。30k+ TPS。" },
-      { "title": "GenLayer",    "desc": "Python智能合约。获取实时网络数据。通过乐观民主进行LLM共识。" },
-      { "title": "安全",        "desc": "彩池模型。2%协议费用。可信解析器桥接（计划多签升级）。" }
+      {
+        "title": "Arc Network",
+        "desc": "EVM兼容L1。USDC原生Gas。确定性终结性<1秒。30k+ TPS。"
+      },
+      {
+        "title": "GenLayer",
+        "desc": "Python智能合约。获取实时网络数据。通过乐观民主进行LLM共识。"
+      },
+      {
+        "title": "安全",
+        "desc": "彩池模型。2%协议费用。可信解析器桥接（计划多签升级）。"
+      }
     ],
     "exploreMarkets": "探索市场"
   },
@@ -200,7 +283,8 @@
     "magicNotConfigured": "邮箱登录需要 Magic API 密钥。请在 .env.local 中添加 NEXT_PUBLIC_MAGIC_API_KEY。",
     "connectMetaMask": "连接 MetaMask",
     "walletNote": "请确保您的钱包已连接到 Arc 测试网（链 ID：5042002）。",
-    "magicNote": "非托管 — 只有您控制自己的密钥。"
+    "magicNote": "非托管 — 只有您控制自己的密钥。",
+    "signInWithPrivy": "使用Privy登录"
   },
   "deposit": {
     "title": "添加资金",
@@ -214,7 +298,16 @@
     "copy": "复制",
     "copied": "已复制！",
     "warning": "请只向此地址发送 Arc 测试网上的 USDC。在其他网络上发送将导致永久损失。",
-    "faucet": "从 Circle 水龙头获取测试 USDC"
+    "faucet": "从 Circle 水龙头获取测试 USDC",
+    "depositTitle": "存入Genetia钱包",
+    "depositSubtitle": "将USDC发送到您的Genetia钱包地址以充值账户。",
+    "walletType": "钱包类型",
+    "networkLabel": "网络",
+    "tokenLabel": "代币",
+    "availableBalance": "可用余额",
+    "lockedInBets": "已锁定在投注中",
+    "provisioning": "正在创建您的Genetia钱包…",
+    "notProvisioned": "钱包尚未创建。请登录以创建您的Genetia钱包。"
   },
   "admin": {
     "title": "管理员控制台",

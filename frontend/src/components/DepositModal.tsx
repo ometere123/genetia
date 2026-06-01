@@ -5,10 +5,12 @@ import {
   X, Copy, Check, ExternalLink, AlertTriangle, CreditCard, Loader2,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useTranslations } from "next-intl";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function DepositModal() {
   const { genetiaWallet, genetiaWalletLoading, balance, closeDepositModal } = useAuth();
+  const t = useTranslations("deposit");
   const [copied, setCopied] = useState(false);
 
   const walletAddress = genetiaWallet?.address;
@@ -31,11 +33,9 @@ export default function DepositModal() {
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <CreditCard size={14} className="text-brand-light" />
-              <h2 className="font-bold text-white text-base">Deposit to Genetia Wallet</h2>
+              <h2 className="font-bold text-white text-base">{t("depositTitle")}</h2>
             </div>
-            <p className="text-xs text-slate-500">
-              Send USDC to your Genetia Wallet address to fund your account.
-            </p>
+            <p className="text-xs text-slate-500">{t("depositSubtitle")}</p>
           </div>
           <button
             onClick={closeDepositModal}
@@ -49,14 +49,12 @@ export default function DepositModal() {
           {genetiaWalletLoading && !walletAddress ? (
             <div className="flex flex-col items-center py-8 gap-3">
               <Loader2 size={24} className="animate-spin text-brand-light" />
-              <p className="text-sm text-slate-400">Provisioning your Genetia Wallet…</p>
+              <p className="text-sm text-slate-400">{t("provisioning")}</p>
             </div>
           ) : !walletAddress ? (
             <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-4 text-center">
               <AlertTriangle size={20} className="text-yellow-400 mx-auto mb-2" />
-              <p className="text-sm text-yellow-300">
-                Wallet not yet provisioned. Sign in to create your Genetia Wallet.
-              </p>
+              <p className="text-sm text-yellow-300">{t("notProvisioned")}</p>
             </div>
           ) : (
             <>
@@ -76,9 +74,9 @@ export default function DepositModal() {
               {/* Network info */}
               <div className="rounded-xl bg-surface-2 border border-border divide-y divide-border overflow-hidden">
                 {[
-                  { label: "Wallet type", value: `Circle ${genetiaWallet.accountType}` },
-                  { label: "Network",     value: genetiaWallet.blockchain },
-                  { label: "Token",       value: "USDC (6 decimals)" },
+                  { label: t("walletType"), value: `Circle ${genetiaWallet.accountType}` },
+                  { label: t("networkLabel"), value: genetiaWallet.blockchain },
+                  { label: t("tokenLabel"), value: "USDC (6 decimals)" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between px-3.5 py-2.5">
                     <span className="text-xs text-slate-500">{label}</span>
@@ -89,9 +87,7 @@ export default function DepositModal() {
 
               {/* Address */}
               <div>
-                <p className="text-xs font-medium text-slate-400 mb-2">
-                  Your Genetia Wallet address
-                </p>
+                <p className="text-xs font-medium text-slate-400 mb-2">{t("yourAddress")}</p>
                 <div className="flex items-center gap-2 rounded-xl bg-surface-2 border border-border px-3.5 py-3">
                   <code className="flex-1 text-[11px] text-slate-300 font-mono break-all leading-relaxed">
                     {walletAddress}
@@ -112,14 +108,14 @@ export default function DepositModal() {
               {/* Balance */}
               <div className="rounded-xl bg-surface-2 border border-border divide-y divide-border overflow-hidden">
                 <div className="flex items-center justify-between px-3.5 py-2.5">
-                  <span className="text-xs text-slate-500">Available balance</span>
+                  <span className="text-xs text-slate-500">{t("availableBalance")}</span>
                   <span className="text-xs font-semibold text-white">
                     ${parseFloat(balance.available).toFixed(2)} USDC
                   </span>
                 </div>
                 {parseFloat(balance.locked) > 0 && (
                   <div className="flex items-center justify-between px-3.5 py-2.5">
-                    <span className="text-xs text-slate-500">Locked in bets</span>
+                    <span className="text-xs text-slate-500">{t("lockedInBets")}</span>
                     <span className="text-xs font-semibold text-yellow-400">
                       ${parseFloat(balance.locked).toFixed(2)} USDC
                     </span>
@@ -143,7 +139,7 @@ export default function DepositModal() {
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full rounded-xl border border-brand/30 bg-brand/5 py-3 text-sm font-medium text-brand-light hover:bg-brand/10 hover:border-brand/50 transition-all"
               >
-                Get testnet USDC from Circle Faucet
+                {t("faucet")}
                 <ExternalLink size={13} />
               </a>
             </>

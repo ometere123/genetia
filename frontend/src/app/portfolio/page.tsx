@@ -7,6 +7,7 @@ import {
   CheckCircle2, Clock, Activity, CreditCard,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTranslations } from "next-intl";
 import clsx from "clsx";
 
 interface BetRecord {
@@ -97,6 +98,7 @@ function computePotentialPayout(bet: BetRecord): number {
 }
 
 export default function PortfolioPage() {
+  const t = useTranslations("portfolio");
   const {
     isConnected, login, authenticated, authedFetch,
     genetiaWallet, genetiaWalletLoading, balance,
@@ -190,7 +192,7 @@ export default function PortfolioPage() {
           {[
             {
               icon: <Wallet size={14} />,
-              label: "Available Balance",
+              label: t("usdcBalance"),
               value: genetiaWalletLoading && !genetiaWallet
                 ? <Loader2 size={14} className="animate-spin text-slate-400" />
                 : `$${fmt(available)}`,
@@ -198,7 +200,7 @@ export default function PortfolioPage() {
             },
             {
               icon: <Activity size={14} />,
-              label: "Locked in Bets",
+              label: t("positionsValue"),
               value: `$${fmt(totalLocked)}`,
               sub: `${active.length} active position${active.length !== 1 ? "s" : ""}`,
             },
@@ -235,8 +237,8 @@ export default function PortfolioPage() {
       <div className="rounded-2xl border border-border bg-surface-1 overflow-hidden">
         <div className="flex border-b border-border">
           {[
-            { key: "active", label: `Active (${active.length})` },
-            { key: "closed", label: `Closed (${closed.length})` },
+            { key: "active", label: t("active", { count: active.length }) },
+            { key: "closed", label: t("closed", { count: closed.length }) },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -255,34 +257,32 @@ export default function PortfolioPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-12 gap-2 text-slate-500 text-sm">
-            <Loader2 size={14} className="animate-spin" /> Loading bets…
+            <Loader2 size={14} className="animate-spin" /> {t("loading")}
           </div>
         ) : (activeTab === "active" ? active : closed).length === 0 ? (
           <div className="p-16 text-center">
             <p className="text-sm text-slate-500 mb-4">
-              {activeTab === "active"
-                ? "No active bets. Find a market and place your first bet."
-                : "No closed bets yet."}
+              {activeTab === "active" ? t("noPositions") : t("closed", { count: 0 })}
             </p>
             {activeTab === "active" && (
               <Link
                 href="/"
                 className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark transition-colors"
               >
-                Browse markets
+                {t("browseMarkets")}
               </Link>
             )}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-[1fr_60px_70px_80px_90px_70px] gap-3 px-5 py-3 text-[11px] font-medium text-slate-500 border-b border-border">
-              <span>Market</span>
-              <span className="text-center">Side</span>
+              <span>{t("market")}</span>
+              <span className="text-center">{t("side")}</span>
               <span className="text-right">Staked</span>
               <span className="text-right">Potential</span>
               <span className="text-center">Status</span>
               <span className="text-right">
-                {activeTab === "active" ? "Closes" : "Settled"}
+                {activeTab === "active" ? t("closes") : t("current")}
               </span>
             </div>
 

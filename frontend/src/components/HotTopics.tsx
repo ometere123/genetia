@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { formatUsdc } from "../lib/format";
 import type { MarketData } from "./MarketCard";
 import { Flame } from "lucide-react";
 import clsx from "clsx";
@@ -15,7 +14,7 @@ export default function HotTopics({ markets }: HotTopicsProps) {
   const t = useTranslations("hotTopics");
 
   const top = [...markets]
-    .sort((a, b) => Number(b.yesPool + b.noPool) - Number(a.yesPool + a.noPool))
+    .sort((a, b) => b.usdcVolume - a.usdcVolume)
     .slice(0, 5);
 
   const breaking = markets
@@ -67,14 +66,13 @@ export default function HotTopics({ markets }: HotTopicsProps) {
           </h3>
           <div className="space-y-1">
             {top.map((m, i) => {
-              const total = m.yesPool + m.noPool;
               const label = m.question.split(" ").slice(0, 3).join(" ") + "…";
               return (
                 <Link key={m.address} href={`/markets/${m.address}`}>
                   <div className="flex items-center gap-2.5 py-2 rounded-lg hover:bg-surface-2 px-2 -mx-2 transition-colors cursor-pointer group">
                     <span className="text-xs text-slate-600 font-mono shrink-0 w-4">{i + 1}</span>
                     <p className="flex-1 text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate">{label}</p>
-                    <span className="text-[11px] text-slate-500 shrink-0">${formatUsdc(total)}</span>
+                    <span className="text-[11px] text-slate-500 shrink-0">${m.usdcVolume.toFixed(2)}</span>
                     <Flame size={10} className="text-orange-400 shrink-0" />
                   </div>
                 </Link>

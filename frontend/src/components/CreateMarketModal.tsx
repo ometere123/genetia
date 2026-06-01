@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -100,9 +100,9 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className=”font-bold text-white”>{t(“suggest”)}</h2>
-            <p className=”text-xs text-slate-500 mt-0.5”>
-              {t(“step”, { current: step + 1, total: STEP_LABELS.length })} — {STEP_LABELS[step]}
+            <h2 className="font-bold text-white">{t("suggest")}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t("step", { current: step + 1, total: STEP_LABELS.length })} — {STEP_LABELS[step]}
             </p>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-surface-3 transition-colors">
@@ -132,7 +132,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </div>
           )}
 
-          {/* Step 0 â€” Market details */}
+          {/* Step 0 â€" Market details */}
           {step === 0 && (
             <>
               <div>
@@ -197,7 +197,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </>
           )}
 
-          {/* Step 1 â€” Resolution */}
+          {/* Step 1 â€" Resolution */}
           {step === 1 && (
             <>
               <div>
@@ -212,7 +212,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
                   maxLength={2000}
                   className="w-full rounded-xl bg-surface-2 border border-border px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-brand/50 focus:outline-none resize-none transition-colors"
                 />
-                <p className=”text-[11px] text-slate-600 mt-1”>{criteria.length}/2000 — {t(“criteriaHint”)}</p>
+                <p className="text-[11px] text-slate-600 mt-1">{criteria.length}/2000 — {t("criteriaHint")}</p>
               </div>
 
               <div>
@@ -255,15 +255,15 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
             </>
           )}
 
-          {/* Step 2 â€” Review */}
+          {/* Step 2 â€" Review */}
           {step === 2 && (
             <div className="space-y-3">
               {[
-                { label: t(“reviewQuestion”), value: question },
-                { label: t(“reviewCategory”), value: tc(category) },
-                { label: t(“reviewCloses”),   value: endDateStr ? new Date(endDateStr).toLocaleString() : “—“ },
-                { label: t(“reviewCriteria”), value: criteria || “—“ },
-                { label: t(“reviewSources”),  value: sources.filter(Boolean).join(“\n”) || t(“reviewNone”) },
+                { label: t("reviewQuestion"), value: question },
+                { label: t("reviewCategory"), value: tc(category) },
+                { label: t("reviewCloses"),   value: endDateStr ? new Date(endDateStr).toLocaleString() : "—" },
+                { label: t("reviewCriteria"), value: criteria || "—" },
+                { label: t("reviewSources"),  value: sources.filter(Boolean).join("\n") || t("reviewNone") },
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-4">
                   <span className="text-xs text-slate-500 w-20 shrink-0 pt-0.5">{label}</span>

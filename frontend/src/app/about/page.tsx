@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   Zap, Shield, Globe, ArrowRight,
   LayoutGrid, LineChart, Brain, Banknote,
@@ -38,7 +38,7 @@ const COMPARE = [
   { feature: "Settlement",   genetia: "< 1 second (Arc)",           poly: "Hours (Polygon)"      },
   { feature: "Gas token",    genetia: "USDC (stable fees)",         poly: "MATIC (volatile)"     },
   { feature: "Finality",     genetia: "Deterministic",              poly: "Probabilistic"        },
-  { feature: "Resolution $", genetia: "< $1 per market",           poly: "$50â€“$500+ in UMA"     },
+  { feature: "Resolution $", genetia: "< $1 per market",           poly: "$50-$500+ in UMA"     },
 ];
 
 export default function AboutPage() {

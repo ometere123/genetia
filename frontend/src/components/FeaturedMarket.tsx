@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { formatUsdc, timeUntil } from "../lib/format";
@@ -11,7 +11,7 @@ interface FeaturedMarketProps {
   market: MarketData;
 }
 
-// Simple sparkline built from fake history â€” replace with real data later.
+// Simple sparkline built from fake history â€" replace with real data later.
 function ProbSparkline({ yesPct }: { yesPct: number }) {
   const pts = generateSparkPoints(yesPct);
   const w = 240, h = 56;
@@ -69,7 +69,7 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
         <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent pointer-events-none" />
 
         <div className="relative flex flex-col lg:flex-row gap-6 p-6">
-          {/* Left â€” content */}
+          {/* Left â€" content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-3">
               <span className="flex items-center gap-1 text-xs font-medium text-yes">
@@ -123,7 +123,7 @@ export default function FeaturedMarket({ market }: FeaturedMarketProps) {
             </div>
           </div>
 
-          {/* Right â€” sparkline */}
+          {/* Right â€" sparkline */}
           <div className="flex flex-col items-end justify-between shrink-0">
             <div className="opacity-70 group-hover:opacity-100 transition-opacity">
               <ProbSparkline yesPct={yesPct} />

@@ -3,19 +3,14 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/markets/[id]/history?range=1H|6H|1D|1W|ALL
  *
- * Reconstructs the YES probability over time from the bets table.
+ * Reconstructs the YES probability over time from the arcTrades table
+ * (LMSR on-chain trades indexed by the cron job).
  *
  * Algorithm:
- *   - Start at 50% / 50% at market creation (no bets yet).
- *   - For each bet in chronological order, add its amount to the
- *     appropriate pool and emit a point.
- *   - Append a final "now" point so the chart line extends to the
- *     current moment instead of stopping at the last bet.
- *
- * Phase-1 implementation — computes from `bets` on every request.
- * Cheap until a market sees thousands of bets; at that point we'd
- * write to a pre-aggregated `market_price_history` table and serve
- * bucketed candles, same API contract.
+ *   - Start at 50/50 at market creation.
+ *   - For each trade in chronological order, accumulate qYes / qNo
+ *     and compute the LMSR price at that point.
+ *   - Append a "now" anchor so the line extends to the current moment.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -55,37 +50,57 @@ export async function GET(
     const range = (req.nextUrl.searchParams.get("range") ?? "ALL").toUpperCase();
     const cutoffMs = RANGE_MS[range] ?? null;
 
-    const bets = await prisma.bet.findMany({
-      where: { marketId: market.id },
-      select: { side: true, amount: true, createdAt: true },
-      orderBy: { createdAt: "asc" },
+    // Fetch the market's b parameter for LMSR price computation.
+    const marketFull = await prisma.market.findUnique({
+      where: { id: market.id },
+      select: { lmsrB: true },
+    });
+    const b = marketFull?.lmsrB ? parseFloat(marketFull.lmsrB.toString()) : null;
+
+    const trades = await prisma.arcTrade.findMany({
+      where: { marketId: market.id, action: { in: ["buy", "sell"] } },
+      select: { side: true, shares: true, action: true, blockTime: true },
+      orderBy: { blockTime: "asc" },
     });
 
-    // Walk through every bet computing the cumulative pools.
-    const points: HistoryPoint[] = [];
-    let yes = 0;
-    let no  = 0;
+    /** Compute LMSR YES price (0-100) from outstanding share counts. */
+    function lmsrPct(qYes: number, qNo: number): number {
+      if (b && b > 0) {
+        const eY = Math.exp(qYes / b);
+        const eN = Math.exp(qNo  / b);
+        return (eY / (eY + eN)) * 100;
+      }
+      const total = qYes + qNo;
+      return total === 0 ? 50 : (qYes / total) * 100;
+    }
 
-    // Seed: market opens at 50/50 with empty pools.
+    const points: HistoryPoint[] = [];
+    let qYes = 0;
+    let qNo  = 0;
+
+    // Seed: market opens at 50/50.
     points.push({
       t: market.createdAt.toISOString(),
-      yesPct: 50,
+      yesPct: lmsrPct(0, 0),
       yesPool: "0",
       noPool:  "0",
     });
 
-    for (const b of bets) {
-      const amt = parseFloat(b.amount.toString());
-      if (b.side === "YES") yes += amt; else no += amt;
-      const total = yes + no;
-      const yesPct = total === 0 ? 50 : (yes / total) * 100;
+    for (const tr of trades) {
+      const qty = parseFloat(tr.shares.toString());
+      const delta = tr.action === "buy" ? qty : -qty;
+      if (tr.side === "YES") qYes = Math.max(0, qYes + delta);
+      else                   qNo  = Math.max(0, qNo  + delta);
       points.push({
-        t: b.createdAt.toISOString(),
-        yesPct,
-        yesPool: yes.toString(),
-        noPool:  no.toString(),
+        t: tr.blockTime.toISOString(),
+        yesPct: lmsrPct(qYes, qNo),
+        yesPool: qYes.toString(),
+        noPool:  qNo.toString(),
       });
     }
+
+    // Use trades.length for betCount so chart shows after first trade
+    const betCount = trades.length;
 
     // Anchor the line at "now" so the chart doesn't cliff off after the
     // last bet. Only meaningful for unresolved markets.
@@ -125,7 +140,7 @@ export async function GET(
       marketId: market.id,
       range,
       points: visible,
-      betCount: bets.length,
+      betCount,
     });
   } catch (err) {
     console.error("[markets/[id]/history]", err);

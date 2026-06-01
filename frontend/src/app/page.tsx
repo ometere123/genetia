@@ -48,27 +48,48 @@ interface DBMarket {
   status: string;
   yesPool: string;
   noPool: string;
+  lmsrB: string | null;
   arcAddress: string | null;
   settlement?: { resolution: string | null } | null;
 }
 
+/**
+ * Compute the LMSR YES price in basis-points (0–10000).
+ * Formula: p(YES) = exp(qYes/b) / (exp(qYes/b) + exp(qNo/b))
+ * Falls back to pool-ratio when b is absent (pre-LMSR markets).
+ */
+function lmsrProbBps(qYes: number, qNo: number, b: number | null): bigint {
+  if (b && b > 0) {
+    const eY = Math.exp(qYes / b);
+    const eN = Math.exp(qNo  / b);
+    const p  = eY / (eY + eN);
+    return BigInt(Math.round(p * 10_000));
+  }
+  // Fallback: simple pool ratio
+  const total = qYes + qNo;
+  if (total === 0) return 5000n;
+  return BigInt(Math.round((qYes / total) * 10_000));
+}
+
 function dbToMarketData(m: DBMarket): MarketData {
-  const yesPool = BigInt(Math.round(parseFloat(m.yesPool) * 1_000_000));
-  const noPool  = BigInt(Math.round(parseFloat(m.noPool)  * 1_000_000));
-  const total   = yesPool + noPool;
-  const probBps = total === 0n ? 5000n : (yesPool * 10_000n) / total;
+  const qYes  = parseFloat(m.yesPool);
+  const qNo   = parseFloat(m.noPool);
+  const b     = m.lmsrB ? parseFloat(m.lmsrB) : null;
+
+  // Keep yesPool/noPool as share counts (micros) for display purposes
+  const yesPool = BigInt(Math.round(qYes * 1_000_000));
+  const noPool  = BigInt(Math.round(qNo  * 1_000_000));
+
   return {
-    // Card uses `address` for the routing slug — use the DB id when there's
-    // no Arc address yet so /markets/[id] still works.
-    address:   m.arcAddress ?? m.id,
-    question:  m.title,
-    category:  m.category,
-    endDate:   BigInt(Math.floor(new Date(m.expiry).getTime() / 1000)),
+    address:    m.arcAddress ?? m.id,
+    question:   m.title,
+    category:   m.category,
+    endDate:    BigInt(Math.floor(new Date(m.expiry).getTime() / 1000)),
     yesPool,
     noPool,
-    resolved:  m.status === "resolved",
-    outcome:   m.settlement?.resolution === "YES",
-    yesProbBps: probBps,
+    resolved:   m.status === "resolved",
+    outcome:    m.settlement?.resolution === "YES",
+    yesProbBps: lmsrProbBps(qYes, qNo, b),
   };
 }
 

@@ -93,7 +93,7 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0 mr-2" aria-label="Genetia home">
-          <svg viewBox="0 0 200 200" className="h-8 w-8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <svg viewBox="0 0 200 200" className="h-10 w-10" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <defs>
               <linearGradient id="genetiaMark" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stopColor="#7c5cff" />

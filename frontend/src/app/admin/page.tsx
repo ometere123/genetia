@@ -691,6 +691,7 @@ function MarketsTab({
 // ── Tab: Users ────────────────────────────────────────────────────────────────
 
 function UsersTab() {
+  const { authedFetch } = useAuth();
   const [users, setUsers]   = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ]             = useState("");
@@ -698,7 +699,7 @@ function UsersTab() {
   const fetchUsers = useCallback(async (search = "") => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/users?limit=50&q=${encodeURIComponent(search)}`);
+      const res = await authedFetch(`/api/admin/users?limit=50&q=${encodeURIComponent(search)}`);
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users ?? []);
@@ -706,7 +707,7 @@ function UsersTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authedFetch]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 

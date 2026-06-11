@@ -81,7 +81,7 @@ interface AdminUser {
     availableBalance: string;
     lockedBalance: string;
   };
-  _count: { bets: number; transactions: number };
+  arcTradeCount: number;
 }
 
 interface Analytics {
@@ -625,7 +625,7 @@ function UsersTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  {["User", "Auth", "Circle Wallet", "Available", "Locked", "Bets", "Joined"].map((h) => (
+                  {["User", "Auth", "Circle Wallet", "Available", "Trades", "Joined"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-[11px] font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -657,11 +657,8 @@ function UsersTab() {
                     <td className="px-4 py-3 text-xs text-yes">
                       ${fmt(u.walletBalance?.availableBalance ?? 0)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-yellow-400">
-                      ${fmt(u.walletBalance?.lockedBalance ?? 0)}
-                    </td>
                     <td className="px-4 py-3 text-xs text-slate-400">
-                      {u._count.bets}
+                      {u.arcTradeCount}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       {new Date(u.createdAt).toLocaleDateString("en-US", {

@@ -171,6 +171,9 @@ model Market {
   /// Block number the indexer last reconciled this market through.
   lastIndexedBlock Decimal?  @map("last_indexed_block") @db.Decimal(28, 0)
 
+  /// Admin-pinned as the featured market on the home page banner.
+  isFeatured       Boolean   @default(false) @map("is_featured")
+
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 

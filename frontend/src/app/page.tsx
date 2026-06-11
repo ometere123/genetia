@@ -50,6 +50,7 @@ interface DBMarket {
   noPool: string;
   lmsrB: string | null;
   usdcVolume: string;
+  isFeatured: boolean;
   arcAddress: string | null;
   settlement?: { resolution: string | null } | null;
 }
@@ -89,6 +90,7 @@ function dbToMarketData(m: DBMarket): MarketData {
     yesPool,
     noPool,
     usdcVolume: parseFloat(m.usdcVolume) || 0,
+    isFeatured: m.isFeatured,
     resolved:   m.status === "resolved",
     outcome:    m.settlement?.resolution === "YES",
     yesProbBps: lmsrProbBps(qYes, qNo, b),
@@ -130,9 +132,10 @@ export default function HomePage() {
   const showFeatured = filterCat === "all" && filterStatus !== "resolved";
 
   const featured = showFeatured
-    ? [...markets]
-        .filter((m) => !m.resolved)
-        .sort((a, b) => Number(b.yesPool + b.noPool) - Number(a.yesPool + a.noPool))[0]
+    ? (markets.find((m) => m.isFeatured && !m.resolved) ??
+       [...markets]
+         .filter((m) => !m.resolved)
+         .sort((a, b) => Number(b.yesPool + b.noPool) - Number(a.yesPool + a.noPool))[0])
     : undefined;
 
   const gridMarkets = featured

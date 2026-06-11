@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Shield, BarChart3, TrendingUp, CheckCircle2, Clock, Plus,
   AlertTriangle, Loader2, RefreshCw, Users, DollarSign, Activity,
-  Gavel, ChevronRight, X, ToggleLeft, ToggleRight, Search,
+  Gavel, ChevronRight, X, ToggleLeft, ToggleRight, Search, Pin, PinOff,
   ArrowUpRight, Eye, Lock, ExternalLink, Inbox, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import Link from "next/link";
@@ -59,6 +59,7 @@ interface Market {
   yesPool: string;
   noPool: string;
   arcAddress?: string | null;
+  isFeatured?: boolean;
   createdAt: string;
   _count?: { arcTrades: number };
   settlement?: {
@@ -237,6 +238,43 @@ function ResolveDialog({
   );
 }
 
+
+// ── Pin button — set this market as the home page featured banner ─────────────
+
+function PinButton({ market, onToggled }: { market: Market; onToggled: () => void }) {
+  const { authedFetch } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const pinned = !!market.isFeatured;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await authedFetch("/api/admin/markets", {
+        method: "POST",
+        body: JSON.stringify({ action: "set_featured", marketId: market.id, featured: !pinned }),
+      });
+      onToggled();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      title={pinned ? "Unpin from home page" : "Pin as featured on home page"}
+      className={`h-7 px-2 flex items-center gap-1 rounded-lg text-[11px] transition-colors disabled:opacity-50 ${
+        pinned
+          ? "bg-brand/20 border border-brand/40 text-brand-light hover:bg-brand/30"
+          : "bg-surface-3 text-slate-400 hover:text-brand-light"
+      }`}
+    >
+      {busy ? <Loader2 size={11} className="animate-spin" /> : pinned ? <PinOff size={11} /> : <Pin size={11} />}
+      {pinned ? "Unpin" : "Pin"}
+    </button>
+  );
+}
 
 // ── Deploy-to-Arc button (markets with no arcAddress) ─────────────────────────
 
@@ -527,6 +565,7 @@ function MarketsTab({
                           </Link>
                           {m.status !== "resolved" && m.status !== "refunded" && (
                             <>
+                              <PinButton market={m} onToggled={onRefresh} />
                               <button
                                 onClick={() => togglePause(m)}
                                 className="h-7 px-2 flex items-center gap-1 rounded-lg bg-surface-3 text-[11px] text-slate-400 hover:text-white transition-colors"

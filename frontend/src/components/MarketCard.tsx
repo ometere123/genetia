@@ -14,6 +14,7 @@ export interface MarketData {
   yesPool: bigint;
   noPool: bigint;
   usdcVolume: number;   // actual USDC traded (sum of buy amounts)
+  isFeatured: boolean;
   resolved: boolean;
   outcome: boolean;
   yesProbBps: bigint;

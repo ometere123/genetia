@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     if (action === "genlayer_resolve") return handleGenlayerResolve(body);
     if (action === "refund")           return handleRefund(body);
     if (action === "deploy_arc")       return handleDeployArc(body);
+    if (action === "set_featured")     return handleSetFeatured(body);
     // Old "resolve" action removed in the LMSR clean-break. Admins now use:
     //   /api/admin/dispute-resolve  (calls Market.adminResolve on-chain)
 
@@ -194,6 +195,27 @@ async function handlePause(body: unknown) {
   return NextResponse.json({ market });
 }
 
+async function handleSetFeatured(body: unknown) {
+  const schema = z.object({ marketId: z.string().min(1), featured: z.boolean() });
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  // Unpin any currently featured market first, then pin the new one.
+  if (parsed.data.featured) {
+    await prisma.market.updateMany({
+      where: { isFeatured: true },
+      data: { isFeatured: false },
+    });
+  }
+
+  const market = await prisma.market.update({
+    where: { id: parsed.data.marketId },
+    data: { isFeatured: parsed.data.featured },
+  });
+
+  return NextResponse.json({ market: { id: market.id, isFeatured: market.isFeatured } });
+}
+
 async function handleDeployArc(body: unknown) {
   const schema = z.object({ marketId: z.string().min(1) });
   const parsed = schema.safeParse(body);
@@ -252,6 +274,7 @@ export async function GET(req: NextRequest) {
         status: true,
         expiry: true,
         arcAddress: true,
+        isFeatured: true,
         lmsrStatus: true,
         proposedOutcome: true,
         pendingSince: true,

@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { verifyPrivyAuth } from "@/lib/privy-server";
 import { createOrGetUserFromPrivyAuth } from "@/lib/user-service";
+import { createMarketOnArc } from "@/lib/arc-factory";
 
 const createSchema = z.object({
   title: z.string().min(5).max(500),
@@ -127,7 +128,29 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ market }, { status: 201 });
+    // Best-effort Arc deployment — failure does not roll back the DB record.
+    // The admin can retry via the "Deploy to Arc" button on the Markets tab.
+    const arc = await createMarketOnArc({
+      question: parsed.data.title,
+      category: parsed.data.category,
+      expiry: new Date(parsed.data.expiry),
+    });
+
+    if (arc.arcAddress) {
+      await prisma.market.update({
+        where: { id: market.id },
+        data: {
+          arcAddress: arc.arcAddress,
+          marketIdOnChain: arc.marketIdOnChain ? arc.marketIdOnChain : undefined,
+          lmsrB: arc.b ? new (await import("@/lib/decimal")).Decimal(arc.b).div(1_000_000) : undefined,
+          lmsrStatus: "Active",
+        },
+      });
+    } else if (arc.error) {
+      console.warn("[markets POST] Arc deploy skipped:", arc.error);
+    }
+
+    return NextResponse.json({ market, arcDeployed: !!arc.arcAddress, arcError: arc.error ?? null }, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     const status =

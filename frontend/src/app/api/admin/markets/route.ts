@@ -13,6 +13,7 @@ import { z } from "zod";
 import { Decimal } from "@/lib/decimal";
 import { runResolverTick } from "@/lib/resolver-pipeline";
 import { requireAdmin, adminErrorResponse } from "@/lib/admin-auth";
+import { createMarketOnArc } from "@/lib/arc-factory";
 
 const genlayerResolveSchema = z.object({
   marketId: z.string().min(1),
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     if (action === "pause")            return handlePause(body);
     if (action === "genlayer_resolve") return handleGenlayerResolve(body);
     if (action === "refund")           return handleRefund(body);
+    if (action === "deploy_arc")       return handleDeployArc(body);
     // Old "resolve" action removed in the LMSR clean-break. Admins now use:
     //   /api/admin/dispute-resolve  (calls Market.adminResolve on-chain)
 
@@ -190,6 +192,38 @@ async function handlePause(body: unknown) {
   });
 
   return NextResponse.json({ market });
+}
+
+async function handleDeployArc(body: unknown) {
+  const schema = z.object({ marketId: z.string().min(1) });
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  const market = await prisma.market.findUnique({ where: { id: parsed.data.marketId } });
+  if (!market) return NextResponse.json({ error: "Market not found" }, { status: 404 });
+  if (market.arcAddress) return NextResponse.json({ error: "Market already deployed on Arc" }, { status: 400 });
+
+  const arc = await createMarketOnArc({
+    question: market.title,
+    category: market.category,
+    expiry: market.expiry,
+  });
+
+  if (!arc.arcAddress) {
+    return NextResponse.json({ error: arc.error ?? "Arc deployment failed" }, { status: 502 });
+  }
+
+  await prisma.market.update({
+    where: { id: market.id },
+    data: {
+      arcAddress: arc.arcAddress,
+      marketIdOnChain: arc.marketIdOnChain ?? undefined,
+      lmsrB: arc.b ? new Decimal(arc.b).div(1_000_000) : undefined,
+      lmsrStatus: "Active",
+    },
+  });
+
+  return NextResponse.json({ deployed: true, arcAddress: arc.arcAddress, arcTxHash: arc.arcTxHash });
 }
 
 /**

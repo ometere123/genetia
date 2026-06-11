@@ -238,6 +238,48 @@ function ResolveDialog({
 }
 
 
+// ── Deploy-to-Arc button (markets with no arcAddress) ─────────────────────────
+
+function DeployArcButton({ marketId, onDeployed }: { marketId: string; onDeployed: () => void }) {
+  const { authedFetch } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState<string | null>(null);
+
+  async function deploy() {
+    if (!confirm("Deploy this market to Arc? This seeds the LMSR contract with 100 USDC from treasury.")) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await authedFetch("/api/admin/markets", {
+        method: "POST",
+        body: JSON.stringify({ action: "deploy_arc", marketId }),
+      });
+      const data = await r.json();
+      if (!r.ok) { setErr(data.error ?? `HTTP ${r.status}`); return; }
+      setTimeout(onDeployed, 1_000);
+    } catch {
+      setErr("Network error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <button
+        onClick={deploy}
+        disabled={busy}
+        className="h-7 px-2 flex items-center gap-1 rounded-lg bg-brand/10 border border-brand/30 text-[11px] text-brand-light hover:bg-brand/20 transition-colors disabled:opacity-50"
+        title="Deploy this market to Arc and seed with 100 USDC from treasury"
+      >
+        {busy ? <Loader2 size={11} className="animate-spin" /> : <Activity size={11} />}
+        {busy ? "Deploying…" : "Deploy to Arc"}
+      </button>
+      {err && <p className="text-[10px] text-red-400 max-w-[180px] leading-tight">{err}</p>}
+    </div>
+  );
+}
+
 // ── Tab: Markets ──────────────────────────────────────────────────────────────
 
 /**
@@ -497,13 +539,16 @@ function MarketsTab({
                               {m.arcAddress ? (
                                 <ForceResolveButtons marketId={m.id} onResolved={onRefresh} />
                               ) : (
-                                <button
-                                  onClick={() => onResolve(m)}
-                                  className="h-7 px-2 flex items-center gap-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-[11px] text-orange-400 hover:bg-orange-500/20 transition-colors"
-                                  title="Wind down legacy market (refund active bets, mark closed)"
-                                >
-                                  <Gavel size={11} /> Wind down
-                                </button>
+                                <>
+                                  <DeployArcButton marketId={m.id} onDeployed={onRefresh} />
+                                  <button
+                                    onClick={() => onResolve(m)}
+                                    className="h-7 px-2 flex items-center gap-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-[11px] text-orange-400 hover:bg-orange-500/20 transition-colors"
+                                    title="Wind down legacy market (refund active bets, mark closed)"
+                                  >
+                                    <Gavel size={11} /> Wind down
+                                  </button>
+                                </>
                               )}
                             </>
                           )}

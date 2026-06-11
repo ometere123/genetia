@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "../../contexts/AuthContext";
+import CreateMarketModal from "../../components/CreateMarketModal";
 import clsx from "clsx";
 
 const ADMIN_ADDRESS = (process.env.NEXT_PUBLIC_ADMIN_ADDRESS ?? "").toLowerCase();
@@ -236,164 +237,6 @@ function ResolveDialog({
   );
 }
 
-// ── Create Market Dialog ──────────────────────────────────────────────────────
-
-function CreateMarketDialog({
-  onClose,
-  onCreated,
-  createdBy,
-}: {
-  onClose: () => void;
-  onCreated: () => void;
-  createdBy: string;
-}) {
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "politics",
-    expiry: "",
-    resolutionSource: "",
-  });
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError]         = useState("");
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.title || !form.expiry) return;
-    setIsPending(true);
-    setError("");
-    try {
-      const res = await fetch("/api/markets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          expiry: new Date(form.expiry).toISOString(),
-          createdBy,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.market) {
-        onClose();
-        onCreated();
-      } else {
-        setError(data.error ?? "Failed to create market");
-      }
-    } catch {
-      setError("Network error");
-    } finally {
-      setIsPending(false);
-    }
-  }
-
-  const CATEGORIES = ["politics", "crypto", "sports", "tech", "economics", "science", "culture"];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-surface-1 shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
-          <div>
-            <h3 className="font-bold text-white">Create Market</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Published immediately as active</p>
-          </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-
-        <form onSubmit={handleCreate} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Question</label>
-            <textarea
-              required
-              rows={2}
-              placeholder="Will Bitcoin exceed $150k by end of 2025?"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full rounded-xl bg-surface-2 border border-border px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-brand/50 focus:outline-none resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Description</label>
-            <textarea
-              required
-              rows={3}
-              placeholder="Describe what counts as YES resolution…"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full rounded-xl bg-surface-2 border border-border px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-brand/50 focus:outline-none resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Category</label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full rounded-xl bg-surface-2 border border-border px-3 py-2.5 text-sm text-white focus:border-brand/50 focus:outline-none"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-surface-3">
-                    {c.charAt(0).toUpperCase() + c.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Expiry date</label>
-              <input
-                type="datetime-local"
-                required
-                value={form.expiry}
-                onChange={(e) => setForm({ ...form, expiry: e.target.value })}
-                className="w-full rounded-xl bg-surface-2 border border-border px-3 py-2.5 text-sm text-white focus:border-brand/50 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              Resolution source URL (for GenLayer)
-            </label>
-            <input
-              type="url"
-              placeholder="https://example.com/data-source"
-              value={form.resolutionSource}
-              onChange={(e) => setForm({ ...form, resolutionSource: e.target.value })}
-              className="w-full rounded-xl bg-surface-2 border border-border px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-brand/50 focus:outline-none"
-            />
-          </div>
-
-          {error && (
-            <p className="text-xs text-red-400 flex items-center gap-1.5">
-              <AlertTriangle size={12} /> {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-border py-2.5 text-sm text-slate-300 hover:bg-surface-2 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-xl bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40 transition-all flex items-center justify-center gap-2"
-            >
-              {isPending && <Loader2 size={14} className="animate-spin" />}
-              {isPending ? "Creating…" : "Publish Market"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 // ── Tab: Markets ──────────────────────────────────────────────────────────────
 
@@ -487,13 +330,11 @@ function MarketsTab({
   loading,
   onRefresh,
   onResolve,
-  createdBy,
 }: {
   markets: Market[];
   loading: boolean;
   onRefresh: () => void;
   onResolve: (m: Market) => void;
-  createdBy: string;
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [q, setQ]                   = useState("");
@@ -678,10 +519,10 @@ function MarketsTab({
       </div>
 
       {showCreate && (
-        <CreateMarketDialog
+        <CreateMarketModal
+          adminMode
           onClose={() => setShowCreate(false)}
           onCreated={onRefresh}
-          createdBy={createdBy}
         />
       )}
     </>
@@ -1814,7 +1655,6 @@ export default function AdminPage() {
             loading={marketsLoading}
             onRefresh={fetchMarkets}
             onResolve={setResolveTarget}
-            createdBy={address ?? "admin"}
           />
         )}
         {activeTab === "queue"       && <ReviewQueueTab onApproved={fetchMarkets} />}

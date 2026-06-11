@@ -10,6 +10,8 @@ import clsx from "clsx";
 
 interface CreateMarketModalProps {
   onClose: () => void;
+  adminMode?: boolean;
+  onCreated?: () => void;
 }
 
 // Step labels are provided by translations at render time
@@ -24,7 +26,7 @@ interface CreateMarketModalProps {
  *
  * Admins should create real markets directly via the admin dashboard.
  */
-export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
+export default function CreateMarketModal({ onClose, adminMode = false, onCreated }: CreateMarketModalProps) {
   const { authedFetch, authenticated, login } = useAuth();
   const t  = useTranslations("create");
   const tc = useTranslations("categories");
@@ -59,24 +61,46 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
     setError(null);
     try {
       const trimmedSources = sources.map((s) => s.trim()).filter(Boolean);
-      const res = await authedFetch("/api/markets/suggest", {
-        method: "POST",
-        body: JSON.stringify({
-          question: question.trim(),
-          description: description.trim() || undefined,
-          category,
-          expiry: new Date(endDateStr).toISOString(),
-          criteria: criteria.trim(),
-          sources: trimmedSources,
-        }),
-      });
+
+      let res: Response;
+      if (adminMode) {
+        const fullDesc = [description.trim(), criteria.trim()].filter(Boolean).join("\n\nResolution criteria: ");
+        res = await authedFetch("/api/markets", {
+          method: "POST",
+          body: JSON.stringify({
+            title: question.trim(),
+            description: fullDesc || question.trim(),
+            category,
+            expiry: new Date(endDateStr).toISOString(),
+            resolutionSource: trimmedSources[0] ?? undefined,
+          }),
+        });
+      } else {
+        res = await authedFetch("/api/markets/suggest", {
+          method: "POST",
+          body: JSON.stringify({
+            question: question.trim(),
+            description: description.trim() || undefined,
+            category,
+            expiry: new Date(endDateStr).toISOString(),
+            criteria: criteria.trim(),
+            sources: trimmedSources,
+          }),
+        });
+      }
+
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to submit suggestion");
+        setError(data.error ?? (adminMode ? "Failed to create market" : "Failed to submit suggestion"));
         return;
       }
       setSuccess(true);
-      setTimeout(onClose, 2200);
+      if (adminMode) {
+        onCreated?.();
+        setTimeout(onClose, 1500);
+      } else {
+        setTimeout(onClose, 2200);
+      }
     } catch {
       setError("Network error. Try again.");
     } finally {
@@ -100,7 +124,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="font-bold text-white">{t("suggest")}</h2>
+            <h2 className="font-bold text-white">{adminMode ? "Create Market" : t("suggest")}</h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {t("step", { current: step + 1, total: STEP_LABELS.length })} — {STEP_LABELS[step]}
             </p>
@@ -118,7 +142,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          {!authenticated && (
+          {!adminMode && !authenticated && (
             <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-3 flex items-start gap-2.5">
               <AlertCircle size={13} className="text-yellow-400 shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -274,7 +298,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
               <div className="flex items-start gap-2 rounded-xl bg-brand/5 border border-brand/20 p-3">
                 <Info size={13} className="text-brand-light shrink-0 mt-0.5" />
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  {t("queueInfo")}
+                  {adminMode ? "This market will be published immediately and visible to all users." : t("queueInfo")}
                 </p>
               </div>
 
@@ -319,7 +343,7 @@ export default function CreateMarketModal({ onClose }: CreateMarketModalProps) {
               className="flex-1 rounded-xl bg-brand py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={13} className="animate-spin" />}
-              {submitting ? t("submitting") : success ? t("submitted") : t("submit")}
+              {submitting ? t("submitting") : success ? (adminMode ? "Published!" : t("submitted")) : (adminMode ? "Publish Market" : t("submit"))}
             </button>
           )}
         </div>

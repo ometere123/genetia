@@ -100,10 +100,25 @@ interface Analytics {
 
 interface Settlement {
   id: string;
-  resolution: string;
-  reasoning?: string;
-  confidence?: number;
-  genlayerTxHash?: string;
+  marketId: string;
+  status: string;
+  resolution: string | null;
+  reasoning?: string | null;
+  confidence?: number | null;
+  genlayerTxHash?: string | null;
+  arcTxHash?: string | null;
+  sources?: {
+    attemptStatus?: string;
+    manifestHash?: string;
+    registerTxHash?: string;
+    resolveTxHash?: string;
+    lastError?: string | null;
+    trustedSources?: string[];
+  } | null;
+  requestedAt?: string;
+  submittedAt?: string | null;
+  finalizedAt?: string | null;
+  arcResolvedAt?: string | null;
   settledAt: string;
   market: {
     id: string;
@@ -1456,19 +1471,119 @@ function DisputeResolvePanel() {
   );
 }
 
+// ── Pipeline status config ────────────────────────────────────────────────────
+
+const PIPELINE_STATUS: Record<string, { label: string; color: string }> = {
+  pending:          { label: "Pending",           color: "bg-slate-500/15 text-slate-400" },
+  pending_resolve:  { label: "Queued",             color: "bg-blue-500/15 text-blue-400" },
+  resolving:        { label: "Resolving…",         color: "bg-blue-500/15 text-blue-300" },
+  manifest_mismatch:{ label: "Manifest Mismatch",  color: "bg-red-500/15 text-red-400 border border-red-500/30" },
+  retry_later:      { label: "Retry Later",        color: "bg-yellow-500/15 text-yellow-400" },
+  blocked:          { label: "Blocked — VOID",     color: "bg-orange-500/15 text-orange-400 border border-orange-500/30" },
+  proposed_on_arc:  { label: "Settled on Arc",     color: "bg-yes/15 text-yes" },
+  failed:           { label: "Failed",             color: "bg-red-500/15 text-red-400" },
+  refunded:         { label: "Refunded",           color: "bg-slate-400/15 text-slate-400" },
+  submitted_to_arc: { label: "Submitted (Admin)",  color: "bg-yes/15 text-yes" },
+};
+
+const ATTEMPT_LABELS: Record<string, string> = {
+  READY_TO_RESOLVE:             "Ready to resolve",
+  REGISTERING_MANIFEST:         "Registering manifest…",
+  MANIFEST_REGISTERED:          "Manifest registered",
+  RESOLUTION_TX_SUBMITTED:      "TX submitted",
+  WAITING_FOR_GENLAYER_FINALITY:"Waiting for GenLayer finality",
+  GENLAYER_FINALIZED:           "GenLayer finalized",
+  READING_RESOLUTION:           "Reading resolution…",
+  MANIFEST_MISMATCH:            "Manifest hash mismatch — review required",
+  RESOLUTION_ACCEPTED:          "Resolution accepted",
+  UNRESOLVED_RETRY_LATER:       "Unresolved — retry later",
+  INVALID_NEEDS_RETRY:          "Invalid — retry required",
+  SETTLEMENT_READY:             "Settlement ready",
+  VOID_BLOCKED_NO_REFUND_PATH:  "VOID — no Arc refund path",
+  SETTLED_ON_ARC:               "Settled on Arc",
+  GENLAYER_FAILED:              "GenLayer tx failed",
+  GENLAYER_TIMEOUT:             "GenLayer tx timed out",
+  GENLAYER_UNDETERMINED:        "GenLayer tx undetermined",
+  FAILED:                       "Fatal error",
+};
+
+function PipelineStatusBadge({ status }: { status: string }) {
+  const cfg = PIPELINE_STATUS[status] ?? { label: status, color: "bg-slate-500/15 text-slate-400" };
+  return (
+    <span className={clsx("rounded-full px-2 py-0.5 text-[11px] font-semibold", cfg.color)}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function TriggerResolveButton({
+  marketId,
+  onTriggered,
+}: {
+  marketId: string;
+  onTriggered: () => void;
+}) {
+  const { authedFetch } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState<string | null>(null);
+
+  async function trigger() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await authedFetch("/api/admin/markets", {
+        method: "POST",
+        body: JSON.stringify({ action: "genlayer_resolve", marketId }),
+      });
+      const data = await r.json();
+      if (!r.ok) { setErr(data.error ?? `HTTP ${r.status}`); return; }
+      setTimeout(onTriggered, 500);
+    } catch {
+      setErr("Network error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <button
+        onClick={trigger}
+        disabled={busy}
+        className="h-7 px-2 flex items-center gap-1 rounded-lg bg-brand/10 border border-brand/30 text-[11px] text-brand-light hover:bg-brand/20 transition-colors disabled:opacity-50"
+      >
+        {busy ? <Loader2 size={11} className="animate-spin" /> : <Activity size={11} />}
+        {busy ? "Triggering…" : "Trigger Resolve"}
+      </button>
+      {err && <p className="text-[10px] text-red-400">{err}</p>}
+    </div>
+  );
+}
+
 function SettlementsTab() {
+  const { authedFetch } = useAuth();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loading, setLoading]         = useState(false);
+  const [filter, setFilter]           = useState<string>("all");
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    fetch("/api/admin/settlements")
-      .then((r) => r.json())
-      .then((d) => setSettlements(d.settlements ?? []))
-      .finally(() => setLoading(false));
-  }, []);
+    try {
+      const r = await authedFetch("/api/admin/settlements");
+      const d = await r.json();
+      setSettlements(d.settlements ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, [authedFetch]);
 
-  if (loading) {
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = filter === "all"
+    ? settlements
+    : settlements.filter((s) => s.status === filter);
+
+  if (loading && settlements.length === 0) {
     return (
       <div className="flex items-center justify-center py-10 gap-2 text-slate-500 text-sm">
         <Loader2 size={14} className="animate-spin" /> Loading settlements…
@@ -1477,54 +1592,167 @@ function SettlementsTab() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <DisputeResolvePanel />
       <BackfillHistoryPanel />
-      {settlements.length === 0 ? (
+
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {(["all", "pending_resolve", "resolving", "proposed_on_arc", "blocked", "manifest_mismatch", "retry_later", "failed"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilter(s)}
+            className={clsx(
+              "rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors",
+              filter === s
+                ? "bg-brand/15 text-brand-light"
+                : "text-slate-500 hover:text-slate-300 hover:bg-surface-2",
+            )}
+          >
+            {s === "all" ? "All" : (PIPELINE_STATUS[s]?.label ?? s)}
+          </button>
+        ))}
+        <button
+          onClick={load}
+          className="ml-auto text-slate-500 hover:text-white transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw size={13} />
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="rounded-xl bg-surface-2 border border-border p-12 text-center text-slate-500 text-sm">
           No settlements yet. Markets appear here after GenLayer resolution.
         </div>
       ) : null}
-      {settlements.map((s) => {
+
+      {filtered.map((s) => {
         const pool = parseFloat(s.market.yesPool) + parseFloat(s.market.noPool);
+        const isBlocked = s.status === "blocked";
+        const isMismatch = s.status === "manifest_mismatch";
+        const isFailed = s.status === "failed";
+        const attemptLabel = s.sources?.attemptStatus
+          ? (ATTEMPT_LABELS[s.sources.attemptStatus] ?? s.sources.attemptStatus)
+          : null;
+
         return (
-          <div key={s.id} className="rounded-2xl border border-border bg-surface-1 p-5">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex-1">
-                <p className="text-sm text-slate-200 leading-snug mb-1">{s.market.title}</p>
+          <div
+            key={s.id}
+            className={clsx(
+              "rounded-2xl border bg-surface-1 p-5 space-y-3",
+              isBlocked  ? "border-orange-500/40" :
+              isMismatch ? "border-red-500/40"    :
+              isFailed   ? "border-red-500/30"    :
+              "border-border"
+            )}
+          >
+            {/* Header row */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-200 leading-snug mb-1.5">{s.market.title}</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] text-slate-500 bg-surface-3 rounded-full px-2 py-0.5">
                     {s.market.category}
                   </span>
-                  <span className="text-[11px] text-slate-500">Pool: ${fmt(pool)}</span>
                   <span className="text-[11px] text-slate-500">
+                    Pool: ${fmt(pool)}
+                  </span>
+                  <span className="text-[11px] text-slate-600">
                     {new Date(s.settledAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>
-              <span className={clsx(
-                "shrink-0 rounded-xl px-3 py-1.5 text-sm font-bold",
-                s.resolution === "YES"
-                  ? "bg-yes/15 text-yes border border-yes/30"
-                  : "bg-no/15 text-no border border-no/30"
-              )}>
-                {s.resolution}
-              </span>
+              <div className="shrink-0 flex flex-col items-end gap-1.5">
+                <PipelineStatusBadge status={s.status} />
+                {s.resolution && (
+                  <span className={clsx(
+                    "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                    s.resolution === "YES"      ? "bg-yes/15 text-yes" :
+                    s.resolution === "NO"       ? "bg-no/15 text-no"  :
+                    s.resolution === "VOID"     ? "bg-orange-500/15 text-orange-400" :
+                    s.resolution === "UNRESOLVED" ? "bg-yellow-500/15 text-yellow-400" :
+                    s.resolution === "INVALID"  ? "bg-slate-500/15 text-slate-300" :
+                    "bg-surface-3 text-slate-400"
+                  )}>
+                    {s.resolution}
+                  </span>
+                )}
+              </div>
             </div>
 
+            {/* Attempt status */}
+            {attemptLabel && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-600 font-medium uppercase tracking-wider">
+                  Step:
+                </span>
+                <span className={clsx(
+                  "text-[11px]",
+                  isMismatch || isFailed ? "text-red-400" :
+                  isBlocked              ? "text-orange-400" :
+                  "text-slate-400"
+                )}>
+                  {attemptLabel}
+                </span>
+              </div>
+            )}
+
+            {/* VOID warning */}
+            {isBlocked && (
+              <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2 text-[11px] text-orange-300">
+                <span className="font-semibold">VOID outcome returned by GenLayer.</span> Arc has no VOID/refund settlement
+                path yet. Manual admin handling required. Options: (A) Force-resolve as INVALID on Arc
+                for pro-rata refunds, or (B) wait for V2 VOID path.
+              </div>
+            )}
+
+            {/* Manifest mismatch warning */}
+            {isMismatch && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-[11px] text-red-300">
+                <span className="font-semibold">Manifest hash mismatch.</span> The market&apos;s current manifest does
+                not match what was already registered on GenLayer. Manual review required before this
+                market can settle.
+              </div>
+            )}
+
+            {/* Error message */}
+            {s.sources?.lastError && (isFailed || isMismatch) && (
+              <div className="rounded-lg bg-surface-2 border border-border px-3 py-2">
+                <p className="text-[10px] text-slate-500 mb-0.5 font-medium">Error detail</p>
+                <p className="text-xs text-red-400 font-mono leading-relaxed break-all">
+                  {s.sources.lastError}
+                </p>
+              </div>
+            )}
+
+            {/* Reasoning */}
             {s.reasoning && (
-              <div className="rounded-xl bg-surface-2 border border-border px-4 py-3 mb-3">
+              <div className="rounded-xl bg-surface-2 border border-border px-4 py-3">
                 <p className="text-[11px] text-slate-500 mb-1 font-medium">GenLayer Reasoning</p>
                 <p className="text-xs text-slate-300 leading-relaxed">{s.reasoning}</p>
               </div>
             )}
 
-            <div className="flex items-center gap-4 flex-wrap">
+            {/* Manifest hash */}
+            {s.sources?.manifestHash && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-600 font-medium uppercase tracking-wider shrink-0">
+                  Manifest:
+                </span>
+                <span className="text-[10px] font-mono text-slate-500 truncate">
+                  {s.sources.manifestHash}
+                </span>
+              </div>
+            )}
+
+            {/* Footer links + actions */}
+            <div className="flex items-center gap-3 flex-wrap pt-1">
               {s.confidence != null && (
                 <div className="flex items-center gap-1.5">
                   <Activity size={11} className="text-brand-light" />
                   <span className="text-[11px] text-slate-400">
-                    Confidence: <span className="text-white">{(s.confidence * 100).toFixed(0)}%</span>
+                    Confidence: <span className="text-white">{(Number(s.confidence) * 100).toFixed(0)}%</span>
                   </span>
                 </div>
               )}
@@ -1538,12 +1766,26 @@ function SettlementsTab() {
                   GenLayer TX <ExternalLink size={10} />
                 </a>
               )}
+              {s.arcTxHash && (
+                <a
+                  href={`https://testnet.arcscan.app/tx/${s.arcTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[11px] text-yes hover:text-white transition-colors"
+                >
+                  Arc TX <ExternalLink size={10} />
+                </a>
+              )}
               <Link
                 href={`/markets/${s.market.id}`}
                 className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors"
               >
                 View market <ChevronRight size={11} />
               </Link>
+              {/* Allow re-triggering stalled settlements */}
+              {(s.status === "pending_resolve" || s.status === "retry_later" || s.status === "failed") && (
+                <TriggerResolveButton marketId={s.marketId} onTriggered={load} />
+              )}
             </div>
           </div>
         );

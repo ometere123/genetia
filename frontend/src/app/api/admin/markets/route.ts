@@ -17,8 +17,6 @@ import { createMarketOnArc } from "@/lib/arc-factory";
 
 const genlayerResolveSchema = z.object({
   marketId: z.string().min(1),
-  // Optional: override the sources stored on the market for this resolution.
-  sources: z.array(z.string().url()).max(5).optional(),
 });
 
 const refundSchema = z.object({
@@ -152,7 +150,7 @@ async function handleGenlayerResolve(body: unknown) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { marketId, sources } = parsed.data;
+  const { marketId } = parsed.data;
 
   // Mark the market for resolution. The pipeline picks up `pending_resolve` rows.
   await prisma.settlement.upsert({
@@ -160,12 +158,18 @@ async function handleGenlayerResolve(body: unknown) {
     create: {
       marketId,
       status: "pending_resolve",
-      sources: sources ?? [],
+      sources: {
+        trustedSources: [],
+        attemptStatus: "READY_TO_RESOLVE",
+      },
     },
     update: {
       status: "pending_resolve",
       requestedAt: new Date(),
-      ...(sources ? { sources } : {}),
+      sources: {
+        trustedSources: [],
+        attemptStatus: "READY_TO_RESOLVE",
+      },
     },
   });
 

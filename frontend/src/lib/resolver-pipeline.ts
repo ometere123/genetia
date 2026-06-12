@@ -2,13 +2,7 @@
  * Canonical market resolution pipeline (server-only) for the LMSR / Arc stack.
  *
  * Arc handles trading, collateral, finality, and redemption. GenLayer handles
- * evidence-based outcome resolution. The bridge between them is currently a
- * trusted app/relayer pipeline, so every verdict is validated and logged as a
- * resolver attestation before the relayer proposes settlement on Arc.
- *
- * Triggered by:
- * - POST /api/cron/resolve-markets
- * - admin "Resolve now" action
+ * evidence-based outcome resolution via a manifest-bound resolver contract.
  */
 
 import "server-only";
@@ -16,27 +10,77 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
 import {
-  submitResolveRequest,
+  getRegisteredMarket,
   getResolution,
+  getResolutionStatus,
+  registerMarket,
+  resolveMarket,
   type GenLayerVerdict,
+  type ResolutionOutcome,
 } from "@/lib/genlayer";
+import {
+  buildResolutionManifest,
+  canonicalStringify,
+  extractTrustedSources,
+  hashResolutionManifestString,
+  type ManifestMarketInput,
+} from "@/lib/resolution-manifest";
 import { LMSR_MARKET_ABI, OUTCOME } from "@/lib/lmsr-abi";
+
+// Structured log helper — each line is JSON for easy grep / log-drain parsing.
+function rlog(step: string, data: Record<string, unknown>): void {
+  console.log(
+    `[resolver:${step}]`,
+    JSON.stringify({ ...data, ts: new Date().toISOString() }),
+  );
+}
 
 const ARC_RPC = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
 const ARC_CHAIN_ID = Number(process.env.NEXT_PUBLIC_ARC_CHAIN_ID ?? "5042002");
 const ARC_RESOLVER_KEY = process.env.ARC_RESOLVER_PRIVATE_KEY ?? "";
-const ARC_ADMIN_KEY = process.env.ARC_ADMIN_PRIVATE_KEY ?? "";
 const EXPECTED_GENLAYER_CONTRACT =
   process.env.GENLAYER_CONTRACT_ADDRESS ??
   process.env.NEXT_PUBLIC_GENLAYER_RESOLVER_ADDRESS ??
-  "";
+  "0x7DE5e141bCD9c8c7f7Ab40396FF517859ec80172";
 const PUBLIC_GENLAYER_CONTRACT = process.env.NEXT_PUBLIC_GENLAYER_RESOLVER_ADDRESS ?? "";
 const SUBMITTED_BY =
   process.env.ARC_RESOLVER_ADDRESS ??
   process.env.NEXT_PUBLIC_ARC_RESOLVER_ADDRESS ??
   "trusted-relayer-app";
 
-export type ResolverOutcome = "YES" | "NO" | "INVALID";
+export type ResolverOutcome = ResolutionOutcome;
+
+export type ResolutionAttemptStatus =
+  | "READY_TO_RESOLVE"
+  | "REGISTERING_MANIFEST"
+  | "MANIFEST_REGISTERED"
+  | "RESOLUTION_TX_SUBMITTED"
+  | "WAITING_FOR_GENLAYER_FINALITY"
+  | "GENLAYER_FINALIZED"
+  | "READING_RESOLUTION"
+  | "MANIFEST_MISMATCH"
+  | "RESOLUTION_ACCEPTED"
+  | "UNRESOLVED_RETRY_LATER"
+  | "INVALID_NEEDS_RETRY"
+  | "SETTLEMENT_READY"
+  | "VOID_BLOCKED_NO_REFUND_PATH"
+  | "SETTLED_ON_ARC"
+  | "GENLAYER_FAILED"
+  | "GENLAYER_TIMEOUT"
+  | "GENLAYER_UNDETERMINED"
+  | "FAILED";
+
+type SettlementMeta = {
+  trustedSources: string[];
+  manifestJson?: string;
+  manifestHash?: string;
+  registerTxHash?: string;
+  resolveTxHash?: string;
+  resolutionStatus?: string | null;
+  lastOutcome?: string | null;
+  lastError?: string | null;
+  attemptStatus?: ResolutionAttemptStatus;
+};
 
 export type ResolverAttestation = {
   marketId: string;
@@ -44,6 +88,7 @@ export type ResolverAttestation = {
   genLayerVerdictId?: string;
   proposedOutcome: ResolverOutcome;
   confidence?: number;
+  manifestHash: string;
   evidenceHash?: string;
   evidenceUrls?: string[];
   reasoningSummary?: string;
@@ -75,7 +120,9 @@ export interface TickResult {
 async function loadInFlightSettlements() {
   return prisma.settlement.findMany({
     where: {
-      status: { in: ["pending_resolve", "resolving"] },
+      status: {
+        in: ["pending_resolve", "resolving", "retry_later"],
+      },
     },
     include: {
       market: {
@@ -97,6 +144,124 @@ async function loadInFlightSettlements() {
 }
 
 type InFlightSettlement = Awaited<ReturnType<typeof loadInFlightSettlements>>[number];
+
+type ResolutionValidationResult =
+  | { ok: true; attestation: ResolverAttestation }
+  | { ok: false; reason: string; code?: ResolutionAttemptStatus };
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseSettlementMeta(value: unknown): SettlementMeta {
+  if (Array.isArray(value)) {
+    return { trustedSources: value.filter((item): item is string => typeof item === "string") };
+  }
+  if (!isObject(value)) {
+    return { trustedSources: [] };
+  }
+  const trustedSources = Array.isArray(value.trustedSources)
+    ? value.trustedSources.filter((item): item is string => typeof item === "string")
+    : [];
+
+  return {
+    trustedSources,
+    manifestJson: typeof value.manifestJson === "string" ? value.manifestJson : undefined,
+    manifestHash: typeof value.manifestHash === "string" ? value.manifestHash : undefined,
+    registerTxHash: typeof value.registerTxHash === "string" ? value.registerTxHash : undefined,
+    resolveTxHash: typeof value.resolveTxHash === "string" ? value.resolveTxHash : undefined,
+    resolutionStatus: typeof value.resolutionStatus === "string" ? value.resolutionStatus : null,
+    lastOutcome: typeof value.lastOutcome === "string" ? value.lastOutcome : null,
+    lastError: typeof value.lastError === "string" ? value.lastError : null,
+    attemptStatus:
+      typeof value.attemptStatus === "string" ? (value.attemptStatus as ResolutionAttemptStatus) : undefined,
+  };
+}
+
+function mergeMeta(
+  base: SettlementMeta,
+  patch: Partial<SettlementMeta>,
+): SettlementMeta {
+  return {
+    ...base,
+    ...patch,
+    trustedSources: patch.trustedSources ?? base.trustedSources,
+  };
+}
+
+function marketToManifestInput(market: InFlightSettlement["market"]): ManifestMarketInput {
+  return {
+    id: market.id,
+    title: market.title,
+    expiry: market.expiry,
+    arcAddress: market.arcAddress,
+    resolutionCriteria: market.resolutionCriteria,
+    resolutionSource: market.resolutionSource,
+  };
+}
+
+function classifyWriteFailure(status: string): ResolutionAttemptStatus {
+  if (status === "TIMEOUT") {
+    return "GENLAYER_TIMEOUT";
+  }
+  if (status === "UNDETERMINED") {
+    return "GENLAYER_UNDETERMINED";
+  }
+  return "GENLAYER_FAILED";
+}
+
+async function updateSettlementState(args: {
+  marketId: string;
+  status: string;
+  meta: SettlementMeta;
+  resolution?: string | null;
+  reasoning?: string | null;
+  confidence?: number | null;
+  genlayerTxHash?: string | null;
+  arcTxHash?: string | null;
+  submittedAt?: Date | null;
+  finalizedAt?: Date | null;
+  arcResolvedAt?: Date | null;
+}) {
+  await prisma.settlement.update({
+    where: { marketId: args.marketId },
+    data: {
+      status: args.status,
+      resolution: args.resolution === undefined ? undefined : args.resolution,
+      reasoning: args.reasoning === undefined ? undefined : args.reasoning,
+      confidence:
+        args.confidence === undefined
+          ? undefined
+          : args.confidence === null
+            ? null
+            : args.confidence / 100,
+      sources: args.meta,
+      genlayerTxHash: args.genlayerTxHash === undefined ? undefined : args.genlayerTxHash,
+      arcTxHash: args.arcTxHash === undefined ? undefined : args.arcTxHash,
+      submittedAt: args.submittedAt === undefined ? undefined : args.submittedAt,
+      finalizedAt: args.finalizedAt === undefined ? undefined : args.finalizedAt,
+      arcResolvedAt: args.arcResolvedAt === undefined ? undefined : args.arcResolvedAt,
+    },
+  });
+}
+
+async function markFailed(
+  marketId: string,
+  reason: string,
+  meta: SettlementMeta,
+  attemptStatus: ResolutionAttemptStatus = "FAILED",
+): Promise<void> {
+  console.error("[resolver] failed", { marketId, reason, attemptStatus });
+  await updateSettlementState({
+    marketId,
+    status: "failed",
+    meta: mergeMeta(meta, {
+      attemptStatus,
+      lastError: reason,
+    }),
+    reasoning: reason,
+  });
+}
 
 export async function runResolverTick(): Promise<TickResult> {
   const now = new Date();
@@ -121,6 +286,7 @@ export async function runResolverTick(): Promise<TickResult> {
       resolutionCriteria: true,
       resolutionSource: true,
       arcAddress: true,
+      expiry: true,
     },
   });
 
@@ -129,18 +295,21 @@ export async function runResolverTick(): Promise<TickResult> {
 
   for (const market of expiredActiveMarkets) {
     try {
-      const sources = extractSources(market.resolutionSource);
+      const trustedSources = extractTrustedSources(market.resolutionSource);
       await prisma.settlement.create({
         data: {
           marketId: market.id,
           status: "pending_resolve",
-          sources,
+          sources: {
+            trustedSources,
+            attemptStatus: "READY_TO_RESOLVE",
+          },
         },
       });
       result.steps.push({
         type: "pending",
         marketId: market.id,
-        reason: "expired market queued for GenLayer resolution",
+        reason: "expired market queued for manifest-bound GenLayer resolution",
       });
     } catch (err) {
       const error = `seed settlement: ${(err as Error).message}`;
@@ -159,8 +328,10 @@ export async function runResolverTick(): Promise<TickResult> {
 
 async function advanceSettlement(
   settlement: InFlightSettlement,
-  result: TickResult
+  result: TickResult,
 ): Promise<ResolverPipelineStep> {
+  const meta = parseSettlementMeta(settlement.sources);
+
   try {
     const market = settlement.market;
     if (!market) {
@@ -191,66 +362,139 @@ async function advanceSettlement(
       };
     }
 
-    const sources = parseSources(settlement.sources) ?? extractSources(market.resolutionSource);
-    const sourceValidation = validateEvidenceSources(sources);
-    if (!sourceValidation.ok) {
-      await markFailed(settlement.marketId, sourceValidation.reason);
-      return { type: "invalid_verdict", marketId: settlement.marketId, reason: sourceValidation.reason };
-    }
-
     const configValidation = validateGenLayerConfig();
     if (!configValidation.ok) {
-      await markFailed(settlement.marketId, configValidation.reason);
+      await markFailed(settlement.marketId, configValidation.reason, meta);
       return { type: "invalid_verdict", marketId: settlement.marketId, reason: configValidation.reason };
     }
 
-    if (settlement.status === "pending_resolve" || !settlement.genlayerTxHash) {
-      const { txHash } = await submitResolveRequest({
-        marketId: settlement.marketId,
-        question: market.title,
-        resolutionCriteria: market.resolutionCriteria ?? market.title,
-        sources,
-      });
-
-      await prisma.settlement.update({
-        where: { marketId: settlement.marketId },
-        data: {
-          status: "resolving",
-          genlayerTxHash: txHash,
-          submittedAt: new Date(),
-          sources,
-        },
-      });
-
-      result.submittedToGenlayer++;
-      return {
-        type: "pending",
-        marketId: settlement.marketId,
-        reason: `submitted to GenLayer: ${txHash}`,
-      };
-    }
-
-    const verdict = await getResolution(settlement.marketId);
-    if (!verdict) {
-      return {
-        type: "pending",
-        marketId: settlement.marketId,
-        reason: "GenLayer verdict not finalized yet",
-      };
-    }
-
-    const validation = validateVerdict({
-      settlement,
-      verdict,
-      evidenceUrls: sources,
+    const manifest = buildResolutionManifest(marketToManifestInput(market));
+    const manifestJson = canonicalStringify(manifest);
+    const manifestHash = hashResolutionManifestString(manifestJson);
+    rlog("manifest-built", {
+      marketId: settlement.marketId,
+      manifestHash,
+      sourcesCount: manifest.trusted_sources.length,
+      trustedSources: manifest.trusted_sources,
+    });
+    const trustedSources =
+      meta.trustedSources.length > 0 ? meta.trustedSources : manifest.trusted_sources;
+    const workingMeta = mergeMeta(meta, {
+      trustedSources,
+      manifestJson,
+      manifestHash,
     });
 
-    if (!validation.ok) {
-      await markFailed(settlement.marketId, validation.reason);
-      console.error("[resolver] rejected verdict", {
+    const registration = await ensureManifestRegistration(
+      settlement.marketId,
+      manifestJson,
+      manifestHash,
+      workingMeta,
+    );
+    if (!registration.ok) {
+      return {
+        type: "invalid_verdict",
         marketId: settlement.marketId,
-        reason: validation.reason,
-        verdict,
+        reason: registration.reason,
+      };
+    }
+
+    let currentMeta = registration.meta;
+
+    await updateSettlementState({
+      marketId: settlement.marketId,
+      status: "resolving",
+      meta: mergeMeta(currentMeta, { attemptStatus: "WAITING_FOR_GENLAYER_FINALITY" }),
+    });
+
+    rlog("resolve-tx-submitting", { marketId: settlement.marketId });
+    const resolveResult = await resolveMarket(settlement.marketId);
+    rlog("resolve-tx-result", {
+      marketId: settlement.marketId,
+      txHash: resolveResult.hash,
+      status: resolveResult.status,
+    });
+    if (resolveResult.status !== "SUCCESS") {
+      const attemptStatus = classifyWriteFailure(resolveResult.status);
+      const reason = resolveResult.message ?? `GenLayer resolve tx ${resolveResult.status.toLowerCase()}`;
+      await markFailed(
+        settlement.marketId,
+        reason,
+        mergeMeta(currentMeta, { resolveTxHash: resolveResult.hash }),
+        attemptStatus,
+      );
+      return { type: "failed_proposal", marketId: settlement.marketId, reason };
+    }
+
+    currentMeta = mergeMeta(currentMeta, {
+      attemptStatus: "GENLAYER_FINALIZED",
+      resolveTxHash: resolveResult.hash,
+    });
+    await updateSettlementState({
+      marketId: settlement.marketId,
+      status: "resolving",
+      meta: currentMeta,
+      genlayerTxHash: resolveResult.hash,
+      submittedAt: new Date(),
+    });
+    result.submittedToGenlayer++;
+
+    await updateSettlementState({
+      marketId: settlement.marketId,
+      status: "resolving",
+      meta: mergeMeta(currentMeta, { attemptStatus: "READING_RESOLUTION" }),
+    });
+
+    const resolutionStatus = await getResolutionStatus(settlement.marketId);
+    const verdict = await getResolution(settlement.marketId);
+    rlog("verdict-read", {
+      marketId: settlement.marketId,
+      resolutionStatus,
+      hasVerdict: !!verdict,
+      outcome: verdict?.outcome ?? null,
+      confidence: verdict?.confidence ?? null,
+      verdictManifestHash: verdict?.manifest_hash ?? null,
+    });
+    if (!verdict) {
+      const reason = "GenLayer resolution payload not yet readable after finalized tx";
+      await markFailed(
+        settlement.marketId,
+        reason,
+        mergeMeta(currentMeta, { resolutionStatus }),
+      );
+      return { type: "failed_proposal", marketId: settlement.marketId, reason };
+    }
+
+    const validation = validateResolution({
+      settlement,
+      verdict,
+      expectedManifestHash: manifestHash,
+      evidenceUrls: trustedSources,
+    });
+
+    rlog("hash-check", {
+      marketId: settlement.marketId,
+      expected: manifestHash,
+      got: verdict.manifest_hash,
+      match: validation.ok,
+      reason: validation.ok ? null : (validation as { reason: string }).reason,
+    });
+    if (!validation.ok) {
+      const attemptStatus = validation.code ?? "FAILED";
+      const nextStatus = attemptStatus === "MANIFEST_MISMATCH" ? "manifest_mismatch" : "failed";
+      await updateSettlementState({
+        marketId: settlement.marketId,
+        status: nextStatus,
+        meta: mergeMeta(currentMeta, {
+          attemptStatus,
+          resolutionStatus,
+          lastOutcome: verdict.outcome,
+          lastError: validation.reason,
+        }),
+        resolution: verdict.outcome,
+        reasoning: validation.reason,
+        confidence: verdict.confidence,
+        finalizedAt: new Date(),
       });
       return {
         type: "invalid_verdict",
@@ -260,57 +504,120 @@ async function advanceSettlement(
     }
 
     const attestation = validation.attestation;
-    console.info("[resolver] validated attestation", attestation);
+    currentMeta = mergeMeta(currentMeta, {
+      attemptStatus: "RESOLUTION_ACCEPTED",
+      resolutionStatus,
+      lastOutcome: attestation.proposedOutcome,
+      lastError: null,
+    });
 
-    if (attestation.proposedOutcome === "INVALID") {
-      const arcTxHash = await adminResolveOnArc(
-        market.arcAddress as `0x${string}`,
-        OUTCOME.INVALID
-      );
-      const submitted = { ...attestation, arcTxHash, status: "submitted" as const };
-      await prisma.settlement.update({
-        where: { marketId: settlement.marketId },
-        data: {
-          status: "consensus_failure",
-          resolution: null,
-          reasoning: attestation.reasoningSummary ?? "GenLayer consensus failure",
-          confidence: attestation.confidence,
-          finalizedAt: new Date(),
-          arcTxHash,
-          arcResolvedAt: new Date(),
-        },
-      });
-      result.invalidatedOnArc++;
-      console.info("[resolver] submitted INVALID admin resolution", submitted);
-      return {
-        type: "proposed_settlement",
+    await updateSettlementState({
+      marketId: settlement.marketId,
+      status: "resolving",
+      meta: currentMeta,
+      resolution: attestation.proposedOutcome,
+      reasoning: attestation.reasoningSummary,
+      confidence: attestation.confidence,
+      finalizedAt: new Date(),
+    });
+
+    rlog("outcome-branch", {
+      marketId: settlement.marketId,
+      outcome: attestation.proposedOutcome,
+      confidence: attestation.confidence,
+      manifestHash: attestation.manifestHash,
+    });
+
+    if (attestation.proposedOutcome === "UNRESOLVED") {
+      await updateSettlementState({
         marketId: settlement.marketId,
-        attestation: submitted,
+        status: "retry_later",
+        meta: mergeMeta(currentMeta, { attemptStatus: "UNRESOLVED_RETRY_LATER" }),
+        resolution: "UNRESOLVED",
+        reasoning: attestation.reasoningSummary ?? verdict.unresolved_reason,
+        confidence: attestation.confidence,
+        finalizedAt: new Date(),
+      });
+      return {
+        type: "pending",
+        marketId: settlement.marketId,
+        reason: verdict.unresolved_reason || "GenLayer returned UNRESOLVED; retry later",
       };
     }
+
+    if (attestation.proposedOutcome === "INVALID") {
+      await updateSettlementState({
+        marketId: settlement.marketId,
+        status: "retry_later",
+        meta: mergeMeta(currentMeta, { attemptStatus: "INVALID_NEEDS_RETRY" }),
+        resolution: "INVALID",
+        reasoning: attestation.reasoningSummary ?? "GenLayer returned INVALID",
+        confidence: attestation.confidence,
+        finalizedAt: new Date(),
+      });
+      return {
+        type: "pending",
+        marketId: settlement.marketId,
+        reason: attestation.reasoningSummary ?? "GenLayer returned INVALID; retry required",
+      };
+    }
+
+    if (attestation.proposedOutcome === "VOID") {
+      await updateSettlementState({
+        marketId: settlement.marketId,
+        status: "blocked",
+        meta: mergeMeta(currentMeta, { attemptStatus: "VOID_BLOCKED_NO_REFUND_PATH" }),
+        resolution: "VOID",
+        reasoning:
+          "VOID outcome returned; Arc refund/void settlement is not wired yet.",
+        confidence: attestation.confidence,
+        finalizedAt: new Date(),
+      });
+      return {
+        type: "invalid_verdict",
+        marketId: settlement.marketId,
+        reason: "VOID outcome returned; Arc refund/void settlement is not wired yet.",
+        attestation,
+      };
+    }
+
+    await updateSettlementState({
+      marketId: settlement.marketId,
+      status: "resolving",
+      meta: mergeMeta(currentMeta, { attemptStatus: "SETTLEMENT_READY" }),
+      resolution: attestation.proposedOutcome,
+      reasoning: attestation.reasoningSummary,
+      confidence: attestation.confidence,
+      finalizedAt: new Date(),
+    });
 
     const onChainOutcome =
       attestation.proposedOutcome === "YES" ? OUTCOME.YES : OUTCOME.NO;
     const arcTxHash = await proposeResolutionOnArc(
       market.arcAddress as `0x${string}`,
-      onChainOutcome
+      onChainOutcome,
     );
+    rlog("arc-settled", {
+      marketId: settlement.marketId,
+      outcome: attestation.proposedOutcome,
+      onChainOutcomeEnum: onChainOutcome,
+      arcTxHash,
+      manifestHash: attestation.manifestHash,
+    });
     const submitted = { ...attestation, arcTxHash, status: "submitted" as const };
 
-    await prisma.settlement.update({
-      where: { marketId: settlement.marketId },
-      data: {
-        status: "proposed_on_arc",
-        resolution: attestation.proposedOutcome,
-        reasoning: attestation.reasoningSummary,
-        confidence: attestation.confidence,
-        arcTxHash,
-        arcResolvedAt: new Date(),
-      },
+    await updateSettlementState({
+      marketId: settlement.marketId,
+      status: "proposed_on_arc",
+      meta: mergeMeta(currentMeta, { attemptStatus: "SETTLED_ON_ARC" }),
+      resolution: attestation.proposedOutcome,
+      reasoning: attestation.reasoningSummary,
+      confidence: attestation.confidence,
+      arcTxHash,
+      arcResolvedAt: new Date(),
     });
 
     result.proposedOnArc++;
-    console.info("[resolver] proposed settlement on Arc", submitted);
     return {
       type: "proposed_settlement",
       marketId: settlement.marketId,
@@ -319,14 +626,106 @@ async function advanceSettlement(
   } catch (err) {
     const message = (err as Error).message;
     result.errors.push({ marketId: settlement.marketId, error: message });
-    await markFailed(settlement.marketId, message).catch(() => undefined);
+    await markFailed(settlement.marketId, message, meta).catch(() => undefined);
     return { type: "failed_proposal", marketId: settlement.marketId, reason: message };
   }
 }
 
+async function ensureManifestRegistration(
+  marketId: string,
+  manifestJson: string,
+  manifestHash: string,
+  meta: SettlementMeta,
+): Promise<{ ok: true; meta: SettlementMeta } | { ok: false; reason: string }> {
+  await updateSettlementState({
+    marketId,
+    status: "resolving",
+    meta: mergeMeta(meta, { attemptStatus: "REGISTERING_MANIFEST" }),
+  });
+
+  const registered = await getRegisteredMarket(marketId);
+  if (registered) {
+    if (registered.manifestHash && registered.manifestHash !== manifestHash) {
+      await updateSettlementState({
+        marketId,
+        status: "manifest_mismatch",
+        meta: mergeMeta(meta, {
+          attemptStatus: "MANIFEST_MISMATCH",
+          lastError: "Existing GenLayer manifest hash does not match expected manifest hash",
+        }),
+        reasoning: "Existing GenLayer manifest hash does not match expected manifest hash",
+      });
+      return {
+        ok: false,
+        reason: "Existing GenLayer manifest hash does not match expected manifest hash",
+      };
+    }
+
+    const nextMeta = mergeMeta(meta, {
+      manifestJson: registered.manifestJson,
+      manifestHash: registered.manifestHash || manifestHash,
+      attemptStatus: "MANIFEST_REGISTERED",
+    });
+    await updateSettlementState({
+      marketId,
+      status: "resolving",
+      meta: nextMeta,
+    });
+    return { ok: true, meta: nextMeta };
+  }
+
+  rlog("manifest-registering", { marketId, manifestHash });
+  const registration = await registerMarket(marketId, manifestJson, manifestHash);
+  rlog("manifest-register-result", {
+    marketId,
+    txHash: registration.hash,
+    status: registration.status,
+  });
+  if (registration.status !== "SUCCESS") {
+    const reason = registration.message ?? `GenLayer register tx ${registration.status.toLowerCase()}`;
+    const alreadyRegistered = /market already registered/i.test(reason);
+    if (alreadyRegistered) {
+      const afterConflict = await getRegisteredMarket(marketId);
+      if (afterConflict?.manifestHash === manifestHash) {
+        const nextMeta = mergeMeta(meta, {
+          manifestJson: afterConflict.manifestJson,
+          manifestHash: afterConflict.manifestHash,
+          registerTxHash: registration.hash,
+          attemptStatus: "MANIFEST_REGISTERED",
+        });
+        await updateSettlementState({
+          marketId,
+          status: "resolving",
+          meta: nextMeta,
+        });
+        return { ok: true, meta: nextMeta };
+      }
+    }
+
+    await markFailed(
+      marketId,
+      reason,
+      mergeMeta(meta, { registerTxHash: registration.hash }),
+      classifyWriteFailure(registration.status),
+    );
+    return { ok: false, reason };
+  }
+
+  const nextMeta = mergeMeta(meta, {
+    registerTxHash: registration.hash,
+    attemptStatus: "MANIFEST_REGISTERED",
+  });
+  await updateSettlementState({
+    marketId,
+    status: "resolving",
+    meta: nextMeta,
+  });
+  return { ok: true, meta: nextMeta };
+}
+
 async function proposeResolutionOnArc(
   marketAddress: `0x${string}`,
-  outcome: number
+  outcome: number,
 ): Promise<string> {
   if (!ARC_RESOLVER_KEY) {
     throw new Error("ARC_RESOLVER_PRIVATE_KEY is required to propose settlement on Arc");
@@ -339,26 +738,10 @@ async function proposeResolutionOnArc(
   });
 }
 
-async function adminResolveOnArc(
-  marketAddress: `0x${string}`,
-  outcome: number
-): Promise<string> {
-  const key = ARC_ADMIN_KEY || ARC_RESOLVER_KEY;
-  if (!key) {
-    throw new Error("ARC_ADMIN_PRIVATE_KEY or ARC_RESOLVER_PRIVATE_KEY is required for INVALID admin resolution");
-  }
-  return arcWriteContract({
-    privateKey: key,
-    address: marketAddress,
-    functionName: "adminResolve",
-    args: [outcome],
-  });
-}
-
 async function arcWriteContract(opts: {
   privateKey: string;
   address: `0x${string}`;
-  functionName: "proposeResolution" | "adminResolve";
+  functionName: "proposeResolution";
   args: unknown[];
 }): Promise<string> {
   const { createWalletClient, createPublicClient, http } = require("viem");
@@ -382,8 +765,10 @@ async function arcWriteContract(opts: {
     functionName: "status",
   });
   const status = Number(statusU);
-  if (status === 3) throw new Error("Arc market is already finalized");
-  if (opts.functionName === "proposeResolution" && status !== 0) {
+  if (status === 3) {
+    throw new Error("Arc market is already finalized");
+  }
+  if (status !== 0) {
     throw new Error(`Arc market is not Active; current status enum=${status}`);
   }
 
@@ -396,55 +781,54 @@ async function arcWriteContract(opts: {
   return hash;
 }
 
-function validateVerdict(args: {
+function validateResolution(args: {
   settlement: InFlightSettlement;
   verdict: GenLayerVerdict;
+  expectedManifestHash: string;
   evidenceUrls: string[];
-}):
-  | { ok: true; attestation: ResolverAttestation }
-  | { ok: false; reason: string } {
-  const { settlement, verdict, evidenceUrls } = args;
+}): ResolutionValidationResult {
+  const { settlement, verdict, expectedManifestHash, evidenceUrls } = args;
   const market = settlement.market;
 
   if (!market?.id || market.id !== settlement.marketId) {
-    return { ok: false, reason: "verdict market id does not match settlement market id" };
+    return { ok: false, reason: "resolution market id does not match settlement market id", code: "FAILED" };
   }
   if (!market.arcAddress || !/^0x[a-fA-F0-9]{40}$/.test(market.arcAddress)) {
-    return { ok: false, reason: "market has no valid Arc contract address" };
+    return { ok: false, reason: "market has no valid Arc contract address", code: "FAILED" };
   }
   if (market.status !== "active") {
-    return { ok: false, reason: `market status is ${market.status}, not active` };
+    return { ok: false, reason: `market status is ${market.status}, not active`, code: "FAILED" };
   }
   if (market.lmsrStatus && market.lmsrStatus !== "Active") {
-    return { ok: false, reason: `Arc market is ${market.lmsrStatus}, not Active` };
+    return { ok: false, reason: `Arc market is ${market.lmsrStatus}, not Active`, code: "FAILED" };
   }
   if (settlement.arcTxHash) {
-    return { ok: false, reason: "verdict already submitted to Arc for this market" };
+    return { ok: false, reason: "resolution already submitted to Arc for this market", code: "FAILED" };
+  }
+  if (verdict.market_id !== settlement.marketId) {
+    return { ok: false, reason: "resolution.market_id mismatch", code: "FAILED" };
+  }
+  if (verdict.manifest_hash !== expectedManifestHash) {
+    return { ok: false, reason: "resolution.manifest_hash does not match expected manifest hash", code: "MANIFEST_MISMATCH" };
+  }
+  if (!Number.isFinite(verdict.confidence) || verdict.confidence < 0 || verdict.confidence > 100) {
+    return { ok: false, reason: "resolution confidence must be between 0 and 100", code: "FAILED" };
   }
 
-  const confidence = verdict.confidence;
-  if (confidence !== undefined && (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)) {
-    return { ok: false, reason: "confidence must be between 0 and 1 when provided" };
+  const allowed: ResolverOutcome[] = ["YES", "NO", "VOID", "UNRESOLVED", "INVALID"];
+  if (!allowed.includes(verdict.outcome)) {
+    return { ok: false, reason: `unsupported GenLayer outcome payload: ${verdict.outcome}`, code: "FAILED" };
   }
 
-  const sourceValidation = validateEvidenceSources(evidenceUrls);
-  if (!sourceValidation.ok) return { ok: false, reason: sourceValidation.reason };
-
-  const proposedOutcome = isConsensusFailure(verdict)
-    ? "INVALID"
-    : verdict.outcome === true
-      ? "YES"
-      : verdict.outcome === false
-        ? "NO"
-        : null;
-
-  if (!proposedOutcome) {
-    return { ok: false, reason: "unsupported GenLayer outcome payload" };
+  const reasoning = verdict.reasoning.trim();
+  if ((verdict.outcome === "YES" || verdict.outcome === "NO" || verdict.outcome === "VOID") && !reasoning) {
+    return { ok: false, reason: "resolution reasoning is required", code: "FAILED" };
   }
-
-  const reasoning = String(verdict.reasoning ?? "").trim();
-  if (!reasoning) {
-    return { ok: false, reason: "verdict reasoning is required" };
+  if (verdict.outcome === "VOID" && !verdict.void_reason.trim()) {
+    return { ok: false, reason: "resolution void_reason is required for VOID outcome", code: "FAILED" };
+  }
+  if (verdict.outcome === "UNRESOLVED" && !verdict.unresolved_reason.trim()) {
+    return { ok: false, reason: "resolution unresolved_reason is required for UNRESOLVED outcome", code: "FAILED" };
   }
 
   return {
@@ -452,12 +836,17 @@ function validateVerdict(args: {
     attestation: {
       marketId: settlement.marketId,
       genLayerContract: EXPECTED_GENLAYER_CONTRACT,
-      genLayerVerdictId: verdict.verdictId ?? settlement.genlayerTxHash ?? undefined,
-      proposedOutcome,
-      confidence,
+      genLayerVerdictId: settlement.genlayerTxHash ?? undefined,
+      proposedOutcome: verdict.outcome,
+      confidence: verdict.confidence,
+      manifestHash: expectedManifestHash,
       evidenceHash: evidenceHash(evidenceUrls),
       evidenceUrls,
-      reasoningSummary: reasoning.slice(0, 500),
+      reasoningSummary:
+        reasoning ||
+        verdict.void_reason.trim() ||
+        verdict.unresolved_reason.trim() ||
+        "GenLayer returned a validated resolution payload.",
       submittedBy: SUBMITTED_BY,
       submittedAt: new Date().toISOString(),
       status: "validated",
@@ -484,68 +873,8 @@ function validateGenLayerConfig(): { ok: true } | { ok: false; reason: string } 
   return { ok: true };
 }
 
-function validateEvidenceSources(sources: string[]): { ok: true } | { ok: false; reason: string } {
-  if (sources.length === 0) {
-    return { ok: false, reason: "at least one evidence URL is required" };
-  }
-  if (sources.length > 5) {
-    return { ok: false, reason: "at most five evidence URLs are supported" };
-  }
-  const bad = sources.find((source) => !/^https?:\/\/[^\s]+$/i.test(source));
-  if (bad) {
-    return { ok: false, reason: `invalid evidence URL: ${bad}` };
-  }
-  return { ok: true };
-}
-
-function isConsensusFailure(verdict: GenLayerVerdict): boolean {
-  return verdict.reasoning.trim().toLowerCase() === "consensus failure";
-}
-
-function extractSources(resolutionSource: string | null): string[] {
-  if (!resolutionSource) return [];
-
-  const filterHttp = (xs: unknown[]) =>
-    xs
-      .filter((s): s is string => typeof s === "string")
-      .map((s) => s.trim())
-      .filter((s) => /^https?:\/\//i.test(s))
-      .slice(0, 5);
-
-  const trimmed = resolutionSource.trim();
-  if (trimmed.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) return filterHttp(parsed);
-    } catch {
-      // Fall through to plain text split.
-    }
-  }
-  return filterHttp(trimmed.split(/[\n,]+/));
-}
-
-function parseSources(json: unknown): string[] | null {
-  if (!json) return null;
-  if (Array.isArray(json)) {
-    return json
-      .filter((s): s is string => typeof s === "string")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-  }
-  return null;
-}
-
 function evidenceHash(urls: string[]): string {
   return `sha256:${createHash("sha256")
     .update(JSON.stringify(urls.map((url) => url.trim()).sort()))
     .digest("hex")}`;
-}
-
-async function markFailed(marketId: string, reason: string): Promise<void> {
-  console.error("[resolver] failed", { marketId, reason });
-  await prisma.settlement.update({
-    where: { marketId },
-    data: { status: "failed", reasoning: reason },
-  });
 }

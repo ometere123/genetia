@@ -1,0 +1,5 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+model Market { id String @id @default(uuid()) marketId String @unique engine String question String status String baseAddress String manifestHash String resolverAddress String resolverReleaseId String genlayerTxId String? terminalOutcome String? closeTime DateTime terminalDeadline DateTime createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model ResolutionAttempt { id String @id @default(uuid()) marketId String attemptNo Int reason String genlayerTxId String? lifecycle String executionStatus String? candidateOutcome String? commitment String? retryDueAt DateTime? submittedAt DateTime? finalizedAt DateTime? market Market @relation(fields:[marketId], references:[id]) @@unique([marketId, attemptNo]) }
+model ChainEvent { id String @id @default(uuid()) chainId Int contractAddress String blockNumber BigInt logIndex Int eventName String payload Json @@unique([chainId, contractAddress, blockNumber, logIndex]) }

@@ -1,0 +1,15 @@
+import { Hono } from "hono";
+import { z } from "zod";
+import { CHAIN } from "@genetia/shared";
+type Env = { DB?: Hyperdrive; BASE_CHAIN_ID:string; GENLAYER_CHAIN_ID:string; GENLAYER_RPC:string };
+const app = new Hono<{Bindings:Env}>().basePath("/api/v1");
+const id = z.string().min(1).max(128);
+app.get("/health", c=>c.json({ok:true, baseChainId:CHAIN.base, genlayerChainId:CHAIN.genlayer}));
+app.get("/markets", c=>c.json({error:"indexed market source is not configured"},503));
+app.get("/markets/:id", c=>{id.parse(c.req.param("id"));return c.json({error:"market index unavailable"},404)});
+for (const suffix of ["prices","trades","liquidity","resolution","evidence"]) app.get(`/markets/:id/${suffix}`, c=>{id.parse(c.req.param("id"));return c.json({error:"indexed market source is not configured"},503);});
+app.post("/markets/:id/quote", c=>{id.parse(c.req.param("id"));return c.json({error:"on-chain quote required"},400)});
+app.post("/markets/:id/prepare-trade", c=>{id.parse(c.req.param("id"));return c.json({error:"wallet authorization required"},400)});
+app.get("/users/:address/positions", c=>c.json({error:"indexed position source is not configured"},503));
+app.get("/users/:address/history", c=>c.json({error:"indexed history source is not configured"},503));
+export default app;

@@ -1,0 +1,9 @@
+name = "genetia-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-04"
+compatibility_flags = ["nodejs_compat"]
+[vars]
+BASE_CHAIN_ID = "84532"
+GENLAYER_CHAIN_ID = "61997"
+GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
+

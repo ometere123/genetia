@@ -1,0 +1,2 @@
+export interface Env { WATCHER_ID:string; WATCHER_PRIVATE_KEY:string; GENLAYER_RPC:string; }
+export default { async fetch(request:Request, env:Env):Promise<Response> { if(!env.WATCHER_ID||!env.WATCHER_PRIVATE_KEY||env.GENLAYER_RPC!=="https://studio-dev.genlayer.com/api") return new Response("misconfigured",{status:503}); return Response.json({watcherId:env.WATCHER_ID, eligible:false, reason:"finalized successful GenLayer receipt required"}); } };

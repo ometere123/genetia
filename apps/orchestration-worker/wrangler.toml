@@ -1,0 +1,6 @@
+name = "genetia-orchestration"
+main = "src/index.ts"
+compatibility_date = "2026-09-04"
+compatibility_flags = ["nodejs_compat"]
+[triggers]
+crons = ["* * * * *"]

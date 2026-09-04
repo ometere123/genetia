@@ -1,0 +1,1 @@
+{"name":"@genetia/sdk","private":true,"version":"0.1.0","type":"module","exports":{".":"./src/index.ts"},"dependencies":{"@genetia/shared":"workspace:*","viem":"^2.21.0"},"scripts":{"typecheck":"tsc --noEmit"}}

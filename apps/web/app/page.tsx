@@ -1,0 +1,1 @@
+export default function Home(){return <main><h1>Genetia</h1><p>Broad YES/NO markets with user-owned Base Sepolia positions and GenLayer Resolution.</p><p>Market discovery is available when the indexed API is configured.</p></main>}

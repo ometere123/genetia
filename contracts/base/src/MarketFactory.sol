@@ -32,7 +32,7 @@ contract MarketFactory {
 
     function createLMSR(address creator, uint256 b, uint256 close, uint256 deadline) external returns (address market) {
         bytes32 id = keccak256(abi.encode(address(this), nextMarketId++));
-        market = address(new LMSRMarket(id, usdc, tokens, feeRouter, creator, b, close, deadline));
+        market = address(new LMSRMarket(id, usdc, tokens, gateway, creator, b, close, deadline));
         markets[id] = market;
         emit MarketCreated(id, market, 1);
     }

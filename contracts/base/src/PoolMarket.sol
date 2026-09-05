@@ -1,101 +1,117 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-import "./interfaces/IUSDC.sol";
 
-contract PoolMarket {
-    IUSDC public immutable usdc;
-    address public immutable creator;
-    address public immutable feeRouter;
-    address public immutable riskManager;
-    address public immutable gateway;
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IFeeRouter, IRiskManager} from "./interfaces/IGenetia.sol";
+
+contract PoolMarket is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    enum Outcome { YES, NO, VOID }
+
+    uint256 public constant FEE_BPS = 150;
+    uint256 public constant BPS = 10_000;
     bytes32 public immutable marketId;
+    bytes32 public immutable releaseId;
+    IERC20 public immutable usdc;
+    address public immutable creator;
+    IFeeRouter public immutable feeRouter;
+    IRiskManager public immutable riskManager;
+    address public immutable gateway;
+    bytes32 public immutable manifestHash;
+    address public immutable resolver;
     uint256 public immutable closeTime;
+    uint256 public immutable resolutionAvailableTime;
     uint256 public immutable terminalDeadline;
+
     uint256 public yesTotal;
     uint256 public noTotal;
-    bool public settled;
-    uint8 public outcome;
-    bool public expired;
-    uint256 public constant FEE_BPS = 150;
-    uint256 public constant BPS = 10000;
-    mapping(address => uint256) public yesReceipt;
-    mapping(address => uint256) public noReceipt;
+    uint256 public totalPaid;
+    uint256 public winningReceiptsClaimed;
+    uint256 public collectedFee;
+    bool public terminal;
+    Outcome public outcome;
+    mapping(address => uint256) public yesReceipts;
+    mapping(address => uint256) public noReceipts;
     mapping(address => bool) public claimed;
-    bool private entered;
-    modifier lock() {
-        require(!entered, "reentrant");
-        entered = true;
-        _;
-        entered = false;
-    }
+
+    event Staked(address indexed account, bool indexed yes, uint256 amount);
+    event Settled(Outcome indexed outcome, uint256 fee);
+    event Claimed(address indexed account, uint256 amount);
 
     constructor(
-        bytes32 id,
-        address token,
-        address _creator,
-        address _feeRouter,
-        address _risk,
-        address _gateway,
-        uint256 close,
-        uint256 deadline
+        bytes32 marketId_, bytes32 releaseId_, address token, address creator_, address feeRouter_, address riskManager_,
+        address gateway_, bytes32 manifestHash_, address resolver_, uint256 closeTime_, uint256 resolutionAvailableTime_,
+        uint256 terminalDeadline_
     ) {
-        require(token != address(0) && close > block.timestamp && deadline > close, "params");
-        marketId = id;
-        usdc = IUSDC(token);
-        creator = _creator;
-        feeRouter = _feeRouter;
-        riskManager = _risk;
-        gateway = _gateway;
-        closeTime = close;
-        terminalDeadline = deadline;
+        require(token != address(0) && gateway_ != address(0) && resolver_ != address(0), "address");
+        require(closeTime_ > block.timestamp && resolutionAvailableTime_ >= closeTime_, "time");
+        require(terminalDeadline_ == resolutionAvailableTime_ + 96 hours, "deadline");
+        marketId = marketId_; releaseId = releaseId_; usdc = IERC20(token); creator = creator_;
+        feeRouter = IFeeRouter(feeRouter_); riskManager = IRiskManager(riskManager_); gateway = gateway_;
+        manifestHash = manifestHash_; resolver = resolver_; closeTime = closeTime_;
+        resolutionAvailableTime = resolutionAvailableTime_; terminalDeadline = terminalDeadline_;
+        usdc.forceApprove(feeRouter_, type(uint256).max);
     }
 
-    function stake(bool yes, uint256 amount) external lock {
-        require(!settled && !expired && block.timestamp < closeTime && amount > 0, "not tradable");
-        usdc.transferFrom(msg.sender, address(this), amount);
-        (bool ok,) =
-            riskManager.call(abi.encodeWithSignature("reserveExposure(address,uint256)", address(this), amount));
-        require(ok, "risk");
-        if (yes) {
-            yesTotal += amount;
-            yesReceipt[msg.sender] += amount;
-        } else {
-            noTotal += amount;
-            noReceipt[msg.sender] += amount;
-        }
+    function stake(bool yes, uint256 amount) external nonReentrant {
+        require(!terminal && block.timestamp < closeTime && amount > 0, "not trading");
+        riskManager.reserveExposure(address(this), amount);
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+        if (yes) { yesReceipts[msg.sender] += amount; yesTotal += amount; }
+        else { noReceipts[msg.sender] += amount; noTotal += amount; }
+        emit Staked(msg.sender, yes, amount);
     }
 
     function settle(uint8 result) external {
-        require(msg.sender == gateway, "gateway");
-        require(!settled && !expired && result <= 2, "settled");
-        require(block.timestamp >= closeTime, "open");
-        if (yesTotal == 0 || noTotal == 0) result = 2;
-        settled = true;
-        outcome = result;
-        if (result < 2) {
-            uint256 fee = (yesTotal + noTotal) * FEE_BPS / BPS;
-            require(usdc.transfer(feeRouter, fee), "fee");
-            (bool ok,) = feeRouter.call(abi.encodeWithSignature("routePool(address,uint256)", creator, fee));
-            require(ok, "route");
+        require(msg.sender == gateway && !terminal && result <= uint8(Outcome.VOID), "settlement");
+        require(block.timestamp >= resolutionAvailableTime, "too early");
+        Outcome finalOutcome = Outcome(result);
+        if (yesTotal == 0 || noTotal == 0) finalOutcome = Outcome.VOID;
+        terminal = true; outcome = finalOutcome;
+        if (finalOutcome != Outcome.VOID) {
+            collectedFee = (yesTotal + noTotal) * FEE_BPS / BPS;
+            feeRouter.routePool(creator, collectedFee);
+            riskManager.releaseExposure(address(this), collectedFee);
         }
+        emit Settled(finalOutcome, collectedFee);
     }
 
     function expireToVoid() external {
-        require(!settled && !expired && block.timestamp >= terminalDeadline, "early");
-        expired = true;
-        outcome = 2;
+        require(!terminal && block.timestamp >= terminalDeadline, "not expired");
+        terminal = true; outcome = Outcome.VOID;
+        emit Settled(Outcome.VOID, 0);
     }
 
-    function claim() external lock {
-        require((settled || expired) && !claimed[msg.sender], "claim");
-        claimed[msg.sender] = true;
-        uint256 receipt = outcome == 0
-            ? yesReceipt[msg.sender]
-            : outcome == 1 ? noReceipt[msg.sender] : yesReceipt[msg.sender] + noReceipt[msg.sender];
-        uint256 winning = outcome == 0 ? yesTotal : outcome == 1 ? noTotal : yesTotal + noTotal;
-        uint256 pool = yesTotal + noTotal;
-        uint256 fee = (outcome < 2 && winning > 0) ? pool * FEE_BPS / BPS : 0;
-        uint256 payout = outcome == 2 ? receipt : (winning == 0 ? 0 : receipt * (pool - fee) / winning);
-        if (payout > 0) require(usdc.transfer(msg.sender, payout), "transfer");
+    function claimable(address account) public view returns (uint256) {
+        if (!terminal || claimed[account]) return 0;
+        if (outcome == Outcome.VOID) return yesReceipts[account] + noReceipts[account];
+        uint256 winnerReceipt = outcome == Outcome.YES ? yesReceipts[account] : noReceipts[account];
+        uint256 winningTotal = outcome == Outcome.YES ? yesTotal : noTotal;
+        return winnerReceipt * (yesTotal + noTotal - collectedFee) / winningTotal;
+    }
+
+    function claim() external nonReentrant returns (uint256 amount) {
+        require(terminal && !claimed[msg.sender], "claimed");
+        amount = claimable(msg.sender);
+        claimed[msg.sender] = true; totalPaid += amount;
+        if (outcome != Outcome.VOID) {
+            winningReceiptsClaimed += outcome == Outcome.YES ? yesReceipts[msg.sender] : noReceipts[msg.sender];
+        }
+        if (amount > 0) { riskManager.releaseExposure(address(this), amount); usdc.safeTransfer(msg.sender, amount); }
+        emit Claimed(msg.sender, amount);
+    }
+
+    /// @notice Sends only mathematically unallocatable rounding dust after every winning receipt has exited.
+    function releaseDust() external nonReentrant returns (uint256 dust) {
+        require(terminal && outcome != Outcome.VOID, "no dust");
+        uint256 winningTotal = outcome == Outcome.YES ? yesTotal : noTotal;
+        require(winningReceiptsClaimed == winningTotal, "claims remain");
+        dust = usdc.balanceOf(address(this));
+        if (dust > 0) {
+            riskManager.releaseExposure(address(this), dust);
+            feeRouter.routeDust(dust);
+        }
     }
 }

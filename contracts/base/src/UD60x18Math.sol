@@ -16,7 +16,7 @@ library UD60x18Math {
     }
 
     function exp(uint256 x) internal pure returns (uint256) {
-        require(x < 133e15, "exp");
+        require(x < 133e18, "exp");
         uint256 y = mul(x, LOG2E);
         uint256 k = y / ONE;
         uint256 f = y - k * ONE;
@@ -37,14 +37,10 @@ library UD60x18Math {
             x /= 2;
             k++;
         }
-        while (x < ONE) {
-            x *= 2;
-            k--;
-        }
         uint256 u = div(x - ONE, x + ONE);
         uint256 u2 = mul(u, u);
         uint256 u3 = mul(u2, u);
-        uint256 u5 = mul(mul(u3, u2), u2);
+        uint256 u5 = mul(u3, u2);
         uint256 u7 = mul(u5, u2);
         return k * LN2 + 2 * (u + u3 / 3 + u5 / 5 + u7 / 7);
     }

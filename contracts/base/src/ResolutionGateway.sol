@@ -1,14 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-contract ResolutionGateway is EIP712 {
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ITerminalMarket} from "./interfaces/IGenetia.sol";
+
+contract ResolutionGateway is AccessControl, EIP712 {
     using ECDSA for bytes32;
+    bytes32 public constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
     uint256 public constant GENLAYER_CHAIN_ID = 61997;
     uint8 public constant THRESHOLD = 3;
 
-    struct Envelope {
+    struct Binding {
+        bytes32 marketId;
+        address resolver;
+        bytes32 manifestHash;
+        bytes32 resolverReleaseId;
+        uint256 terminalDeadline;
+    }
+
+    struct ResolutionEnvelope {
         bytes32 marketId;
         address baseMarket;
         uint256 baseChainId;
@@ -20,82 +32,96 @@ contract ResolutionGateway is EIP712 {
         uint8 attempt;
         uint8 outcome;
         bytes32 resultCommitment;
-        uint256 deadline;
     }
-    bytes32 private constant TYPEHASH = keccak256(
-        "Envelope(bytes32 marketId,address baseMarket,uint256 baseChainId,address resolver,uint256 genlayerChainId,bytes32 genlayerTxId,bytes32 manifestHash,bytes32 resolverReleaseId,uint8 attempt,uint8 outcome,bytes32 resultCommitment,uint256 deadline)"
+
+    bytes32 public constant ENVELOPE_TYPEHASH = keccak256(
+        "ResolutionEnvelope(bytes32 marketId,address baseMarket,uint256 baseChainId,address resolver,uint256 genlayerChainId,bytes32 genlayerTxId,bytes32 manifestHash,bytes32 resolverReleaseId,uint8 attempt,uint8 outcome,bytes32 resultCommitment)"
     );
-    mapping(address => bool) public watcher;
-    mapping(bytes32 => bool) public usedTx;
+
     address[5] public watchers;
-    address public admin;
-
-    struct Binding {
-        address resolver;
-        bytes32 manifestHash;
-        bytes32 releaseId;
-    }
+    mapping(address => bool) public isWatcher;
     mapping(address => Binding) public bindings;
+    mapping(bytes32 => bool) public consumedTransactions;
+    address public factory;
 
-    constructor(address safe, address[5] memory signers) EIP712("Genetia Resolution", "1") {
-        admin = safe;
-        for (uint256 i; i < 5; i++) {
-            watchers[i] = signers[i];
-            watcher[signers[i]] = true;
+    event MarketRegistered(address indexed market, bytes32 indexed marketId, address indexed resolver, bytes32 manifestHash);
+    event ResolutionConsumed(address indexed market, bytes32 indexed genlayerTxId, uint8 outcome, bytes32 resultCommitment);
+
+    constructor(address safe, address factory_, address[5] memory signerSet) EIP712("Genetia Resolution", "1") {
+        require(safe != address(0), "safe");
+        _grantRole(DEFAULT_ADMIN_ROLE, safe);
+        if (factory_ != address(0)) { factory = factory_; _grantRole(FACTORY_ROLE, factory_); }
+        for (uint256 i; i < 5; ++i) {
+            address signer = signerSet[i];
+            require(signer != address(0) && !isWatcher[signer], "watcher set");
+            watchers[i] = signer;
+            isWatcher[signer] = true;
         }
     }
 
-    function digest(Envelope calldata e) public view returns (bytes32) {
+    function setFactory(address factory_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(factory == address(0) && factory_ != address(0), "factory set");
+        factory = factory_;
+        _grantRole(FACTORY_ROLE, factory_);
+    }
+
+    function registerMarket(
+        address market,
+        bytes32 marketId,
+        address resolver,
+        bytes32 manifestHash,
+        bytes32 resolverReleaseId,
+        uint256 terminalDeadline
+    ) external onlyRole(FACTORY_ROLE) {
+        require(market != address(0) && resolver != address(0), "address");
+        require(bindings[market].resolver == address(0), "binding immutable");
+        bindings[market] = Binding(marketId, resolver, manifestHash, resolverReleaseId, terminalDeadline);
+        emit MarketRegistered(market, marketId, resolver, manifestHash);
+    }
+
+    function digest(ResolutionEnvelope calldata envelope) public view returns (bytes32) {
         return _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    TYPEHASH,
-                    e.marketId,
-                    e.baseMarket,
-                    e.baseChainId,
-                    e.resolver,
-                    e.genlayerChainId,
-                    e.genlayerTxId,
-                    e.manifestHash,
-                    e.resolverReleaseId,
-                    e.attempt,
-                    e.outcome,
-                    e.resultCommitment,
-                    e.deadline
+                    ENVELOPE_TYPEHASH,
+                    envelope.marketId,
+                    envelope.baseMarket,
+                    envelope.baseChainId,
+                    envelope.resolver,
+                    envelope.genlayerChainId,
+                    envelope.genlayerTxId,
+                    envelope.manifestHash,
+                    envelope.resolverReleaseId,
+                    envelope.attempt,
+                    envelope.outcome,
+                    envelope.resultCommitment
                 )
             )
         );
     }
 
-    function bindMarket(address market, address resolver, bytes32 manifest, bytes32 releaseId) external {
-        require(msg.sender == admin, "admin");
-        require(bindings[market].resolver == address(0), "binding immutable");
-        bindings[market] = Binding(resolver, manifest, releaseId);
+    function submitResolution(ResolutionEnvelope calldata envelope, bytes[] calldata signatures) external {
+        Binding memory binding = bindings[envelope.baseMarket];
+        require(binding.resolver != address(0), "unknown market");
+        require(block.timestamp < binding.terminalDeadline, "terminal deadline");
+        require(envelope.baseChainId == block.chainid && envelope.genlayerChainId == GENLAYER_CHAIN_ID, "wrong chain");
+        require(envelope.marketId == binding.marketId && envelope.resolver == binding.resolver, "wrong binding");
+        require(envelope.manifestHash == binding.manifestHash, "wrong manifest");
+        require(envelope.resolverReleaseId == binding.resolverReleaseId, "wrong release");
+        require(envelope.outcome <= 2 && !consumedTransactions[envelope.genlayerTxId], "invalid result");
+        require(_countValidSigners(digest(envelope), signatures) >= THRESHOLD, "watcher quorum");
+        consumedTransactions[envelope.genlayerTxId] = true;
+        ITerminalMarket(envelope.baseMarket).settle(envelope.outcome);
+        emit ResolutionConsumed(envelope.baseMarket, envelope.genlayerTxId, envelope.outcome, envelope.resultCommitment);
     }
 
-    function verify(Envelope calldata e, bytes[] calldata sigs) public view returns (bool) {
-        Binding memory b = bindings[e.baseMarket];
-        require(
-            e.baseChainId == block.chainid && e.genlayerChainId == GENLAYER_CHAIN_ID && e.outcome <= 2
-                && !usedTx[e.genlayerTxId] && b.resolver == e.resolver && b.manifestHash == e.manifestHash
-                && b.releaseId == e.resolverReleaseId,
-            "invalid envelope"
-        );
-        uint256 count;
-        address last;
-        for (uint256 i; i < sigs.length; i++) {
-            address s = digest(e).recover(sigs[i]);
-            require(watcher[s] && s > last, "duplicate signer");
-            last = s;
-            count++;
+    function _countValidSigners(bytes32 envelopeDigest, bytes[] calldata signatures) internal view returns (uint256 count) {
+        address[] memory seen = new address[](signatures.length);
+        for (uint256 i; i < signatures.length; ++i) {
+            address signer = envelopeDigest.recover(signatures[i]);
+            require(isWatcher[signer], "invalid watcher");
+            for (uint256 j; j < count; ++j) require(seen[j] != signer, "duplicate watcher");
+            seen[count++] = signer;
         }
-        return count >= THRESHOLD;
-    }
-
-    function consume(Envelope calldata e, bytes[] calldata sigs) external {
-        require(verify(e, sigs), "quorum");
-        usedTx[e.genlayerTxId] = true;
-        (bool ok,) = e.baseMarket.call(abi.encodeWithSignature("settle(uint8)", e.outcome));
-        require(ok, "settlement");
     }
 }

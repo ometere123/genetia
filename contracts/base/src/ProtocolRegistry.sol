@@ -26,6 +26,7 @@ contract ProtocolRegistry is AccessControl {
         onlyRole(RELEASE_ADMIN_ROLE)
     {
         require(id != bytes32(0) && implementation != address(0), "invalid release");
+        require(releases[id].implementation == address(0), "release immutable");
         releases[id] = Release(implementation, bytecodeHash, commitSha, true);
         emit ReleaseRegistered(id, implementation, bytecodeHash, commitSha);
     }
@@ -34,5 +35,9 @@ contract ProtocolRegistry is AccessControl {
         require(releases[pool].active && releases[lmsr].active, "release inactive");
         defaultPoolRelease = pool;
         defaultLMSRRelease = lmsr;
+    }
+
+    function isActive(bytes32 releaseId) external view returns (bool) {
+        return releases[releaseId].active;
     }
 }

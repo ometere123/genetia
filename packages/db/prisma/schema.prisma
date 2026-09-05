@@ -1,5 +1,284 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
-model Market { id String @id @default(uuid()) marketId String @unique engine String question String status String baseAddress String manifestHash String resolverAddress String resolverReleaseId String genlayerTxId String? terminalOutcome String? closeTime DateTime terminalDeadline DateTime createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model ResolutionAttempt { id String @id @default(uuid()) marketId String attemptNo Int reason String genlayerTxId String? lifecycle String executionStatus String? candidateOutcome String? commitment String? retryDueAt DateTime? submittedAt DateTime? finalizedAt DateTime? market Market @relation(fields:[marketId], references:[id]) @@unique([marketId, attemptNo]) }
-model ChainEvent { id String @id @default(uuid()) chainId Int contractAddress String blockNumber BigInt logIndex Int eventName String payload Json @@unique([chainId, contractAddress, blockNumber, logIndex]) }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MarketEngine {
+  POOL
+  LMSR
+}
+
+enum MarketStatus {
+  PROPOSED
+  ADMISSIBILITY
+  REVISION
+  APPROVED
+  FUNDING
+  ACTIVE
+  CLOSED
+  RESOLVING
+  TERMINAL
+  EXPIRED
+  FUNDING_FAILED
+}
+
+enum ResolutionReason {
+  EVIDENCE
+  TECHNICAL
+}
+
+enum TerminalOutcome {
+  YES
+  NO
+  VOID
+}
+
+model User {
+  id          String   @id @default(uuid()) @db.Uuid
+  privyUserId String   @unique
+  displayName String?
+  avatarUrl   String?
+  wallets     Wallet[]
+  proposals   Proposal[]
+  apiKeys     ApiKey[]
+  notifications Notification[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Wallet {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  chainId   Int
+  address   String
+  kind      String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([chainId, address])
+  @@index([userId])
+}
+
+model Market {
+  id                        String @id @default(uuid()) @db.Uuid
+  marketId                  String @unique
+  engine                    MarketEngine
+  creatorAddress            String
+  creatorUserId             String? @db.Uuid
+  title                     String
+  question                  String
+  description               String
+  category                  String
+  status                    MarketStatus
+  financialReleaseId        String
+  resolverReleaseId         String
+  gatewayReleaseId          String
+  baseChainId               Int @default(84532)
+  baseAddress               String @unique
+  collateralAddress         String
+  deploymentBlock           BigInt
+  genlayerChainId           Int @default(61997)
+  resolverAddress           String
+  genlayerDeploymentEpoch   String
+  manifestJson              Json
+  manifestHash              String
+  closeTime                 DateTime
+  resolutionAvailableTime   DateTime
+  terminalDeadline          DateTime
+  currentResolutionAttempt  Int @default(0)
+  finalizedResolutionTxId   String?
+  terminalOutcome           TerminalOutcome?
+  poolYesTotal              Decimal? @db.Decimal(78, 0)
+  poolNoTotal               Decimal? @db.Decimal(78, 0)
+  lmsrB                     Decimal? @db.Decimal(78, 0)
+  lmsrFundingTarget         Decimal? @db.Decimal(78, 0)
+  indexedExposure           Decimal @default(0) @db.Decimal(78, 0)
+  proposals                 Proposal[]
+  attempts                  ResolutionAttempt[]
+  evidence                  Evidence[]
+  attestations              WatcherAttestation[]
+  trades                    Trade[]
+  liquidity                 LiquidityActivity[]
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  @@index([status, closeTime])
+  @@index([category, createdAt])
+}
+
+model Proposal {
+  id              String @id @default(uuid()) @db.Uuid
+  proposerUserId  String @db.Uuid
+  marketId        String? @db.Uuid
+  proposalKey     String @unique
+  revision        Int @default(0)
+  canonicalTerms  Json
+  bondTxHash      String @unique
+  bondAmount      Decimal @db.Decimal(78, 0)
+  decision        String?
+  bondDisposition String?
+  proposer        User @relation(fields: [proposerUserId], references: [id])
+  market          Market? @relation(fields: [marketId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ResolutionAttempt {
+  id                  String @id @default(uuid()) @db.Uuid
+  marketId            String @db.Uuid
+  attemptNo           Int
+  reason              ResolutionReason
+  idempotencyKey      String @unique
+  genlayerTxId        String? @unique
+  lifecycle           String
+  executionStatus     String?
+  candidateOutcome    String?
+  resultCommitment    String?
+  evidenceJson        Json?
+  errorClassification String?
+  retryDueAt          DateTime?
+  submittedAt         DateTime?
+  finalizedAt         DateTime?
+  market              Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  @@unique([marketId, attemptNo, reason])
+  @@index([lifecycle, retryDueAt])
+}
+
+model Evidence {
+  id              String @id @default(uuid()) @db.Uuid
+  marketId        String @db.Uuid
+  attemptNo       Int
+  sourceIdentity  String
+  url             String
+  normalizedFacts Json
+  fetchedAt       DateTime
+  freshnessAt     DateTime?
+  commitment      String
+  market          Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  @@unique([marketId, attemptNo, sourceIdentity, url])
+}
+
+model WatcherAttestation {
+  id               String @id @default(uuid()) @db.Uuid
+  marketId         String @db.Uuid
+  watcherId        String
+  watcherAddress   String
+  genlayerTxId     String
+  resultCommitment String
+  outcome          TerminalOutcome
+  signature        String
+  createdAt        DateTime @default(now())
+  market           Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  @@unique([marketId, genlayerTxId, watcherAddress])
+  @@index([genlayerTxId, resultCommitment])
+}
+
+model ChainEvent {
+  id              String @id @default(uuid()) @db.Uuid
+  chainId         Int
+  transactionHash String
+  logIndex        Int
+  blockNumber     BigInt
+  blockHash       String
+  contractAddress String
+  eventName       String
+  payload         Json
+  canonical       Boolean @default(true)
+  indexedAt       DateTime @default(now())
+  @@unique([chainId, transactionHash, logIndex])
+  @@index([chainId, blockNumber, logIndex])
+}
+
+model Trade {
+  id              String @id @default(uuid()) @db.Uuid
+  marketId        String @db.Uuid
+  chainEventId    String @unique @db.Uuid
+  transactionHash String
+  walletAddress   String
+  action          String
+  side            String
+  shares          Decimal @db.Decimal(78, 0)
+  notional        Decimal @db.Decimal(78, 0)
+  fee             Decimal @db.Decimal(78, 0)
+  blockNumber     BigInt
+  market          Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  @@index([marketId, walletAddress])
+}
+
+model LiquidityActivity {
+  id              String @id @default(uuid()) @db.Uuid
+  marketId        String @db.Uuid
+  chainEventId    String @unique @db.Uuid
+  transactionHash String
+  walletAddress   String
+  action          String
+  assets          Decimal @db.Decimal(78, 0)
+  shares          Decimal @db.Decimal(78, 0)
+  blockNumber     BigInt
+  market          Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  @@index([marketId, walletAddress])
+}
+
+model Notification {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @db.Uuid
+  type           String
+  dedupeKey      String @unique
+  payload        Json
+  deliveredAt    DateTime?
+  acknowledgedAt DateTime?
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+}
+
+model ApiKey {
+  id          String @id @default(uuid()) @db.Uuid
+  userId      String @db.Uuid
+  keyHash     String @unique
+  label       String
+  scopes      String[]
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model CostAccounting {
+  id             String @id @default(uuid()) @db.Uuid
+  operationKey   String @unique
+  walletAddress  String?
+  category       String
+  amountUsdMicros BigInt
+  sponsoredOps   Int @default(0)
+  occurredAt     DateTime
+  metadata       Json?
+  @@index([walletAddress, occurredAt])
+  @@index([category, occurredAt])
+}
+
+model IndexerCursor {
+  chainId          Int @id
+  deploymentBlock  BigInt
+  nextBlock         BigInt
+  lastBlockHash     String?
+  updatedAt         DateTime @updatedAt
+}
+
+model WorkflowState {
+  idempotencyKey String @id
+  workflowType   String
+  externalId     String?
+  state          String
+  payload        Json
+  attempts       Int @default(0)
+  nextRunAt      DateTime?
+  deadLetteredAt DateTime?
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([state, nextRunAt])
+}

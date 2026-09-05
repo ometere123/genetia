@@ -1,8 +1,86 @@
 import { z } from "zod";
-export const CHAIN = { base: 84532, genlayer: 61997 } as const;
-export const Engine = z.enum(["POOL", "LMSR"]);
-export const Outcome = z.enum(["YES", "NO", "VOID"]);
-export const Market = z.object({ id:z.string(), marketId:z.string(), engine:Engine, question:z.string(), status:z.string(), baseAddress:z.string(), resolverAddress:z.string(), manifestHash:z.string(), closeTime:z.string(), terminalDeadline:z.string() });
-export const ResolutionEnvelope = z.object({ marketId:z.string(), baseMarket:z.string(), baseChainId:z.literal(84532), resolver:z.string(), genlayerChainId:z.literal(61997), genlayerTxId:z.string(), manifestHash:z.string(), resolverReleaseId:z.string(), attempt:z.number().int().positive(), outcome:z.number().int().min(0).max(2), resultCommitment:z.string(), deadline:z.string() });
-export type Market = z.infer<typeof Market>; export type ResolutionEnvelope = z.infer<typeof ResolutionEnvelope>;
-export function lmsrFundingTarget(bMicro: bigint): bigint { const ln2Numerator=693147180559945309n; const target=(bMicro*ln2Numerator*110n)/(100n*10n**18n); return target>100_000_000n?target:100_000_000n; }
+
+export const NETWORK = {
+  base: { chainId: 84532, name: "Base Sepolia" },
+  genlayer: { chainId: 61997, rpc: "https://studio-dev.genlayer.com/api", sdkChain: "studioDevnet" },
+} as const;
+export const CHAIN = { base: NETWORK.base.chainId, genlayer: NETWORK.genlayer.chainId } as const;
+export const USDC_DECIMALS = 6;
+export const EngineSchema = z.enum(["POOL", "LMSR"]);
+export const OutcomeSchema = z.enum(["YES", "NO", "VOID"]);
+export const ResolutionStateSchema = z.enum(["SUBMITTED", "PENDING", "ACCEPTED", "FINALIZED"]);
+export const ExecutionStateSchema = z.enum(["FINISHED_WITH_RETURN", "FAILED", "UNKNOWN"]);
+export const AddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
+export const HashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
+export const AmountSchema = z.string().regex(/^\d+$/);
+
+export const EvidenceSourceSchema = z.object({
+  identity: z.string().min(1), exact_url: z.string().url().optional(), allowed_domain: z.string().min(1).optional(),
+  allowed_path: z.string().optional(), source_type: z.string().min(1), priority: z.number().int().nonnegative(), required: z.boolean(),
+}).refine((source) => Boolean(source.exact_url || source.allowed_domain), "source requires an exact URL or locked domain");
+
+export const ResolutionManifestSchema = z.object({
+  market_id: z.string().min(1), base_chain_id: z.literal(84532), base_market_address: AddressSchema,
+  genlayer_chain_id: z.literal(61997), question: z.string().min(8), yes_definition: z.string().min(8), no_definition: z.string().min(8),
+  close_time: z.string().datetime(), resolution_available_time: z.string().datetime(), absolute_terminal_deadline: z.string().datetime(),
+  evidence_attempt_schedule_seconds: z.tuple([z.literal(0), z.literal(1800), z.literal(14400), z.literal(86400), z.literal(259200)]),
+  void_conditions: z.array(z.string().min(1)).min(1), resolution_profile: z.enum(["STRUCTURED", "MULTI_SOURCE", "SEMANTIC", "COMPOSITE"]),
+  authoritative_sources: z.array(EvidenceSourceSchema).min(1), fallback_sources: z.array(EvidenceSourceSchema),
+  corroboration_rule: z.string().min(1), minimum_corroborating_sources: z.number().int().positive(),
+  freshness_rule: z.string().min(1), discovery_rule: z.string().min(1), official_source_required: z.boolean(),
+  arbitrary_caller_urls_forbidden: z.literal(true), prompt_release_id: z.string().min(1), manifest_release_id: z.string().min(1),
+  resolver_release_id: z.string().min(1), manifest_hash: HashSchema,
+});
+
+export const MarketSchema = z.object({
+  id: z.string(), marketId: z.string(), engine: EngineSchema, title: z.string(), question: z.string(), description: z.string(),
+  category: z.string(), status: z.string(), creatorAddress: AddressSchema, baseAddress: AddressSchema,
+  financialReleaseId: z.string(), resolverAddress: AddressSchema, resolverReleaseId: z.string(), manifestHash: HashSchema,
+  closeTime: z.string().datetime(), resolutionAvailableTime: z.string().datetime(), terminalDeadline: z.string().datetime(),
+  pool: z.object({ yesTotal: AmountSchema, noTotal: AmountSchema }).optional(),
+  lmsr: z.object({ b: AmountSchema, fundingTarget: AmountSchema, funded: AmountSchema, yesPrice: AmountSchema, noPrice: AmountSchema }).optional(),
+  terminalOutcome: OutcomeSchema.nullable().optional(),
+});
+
+export const ResolutionEnvelopeSchema = z.object({
+  marketId: HashSchema, baseMarket: AddressSchema, baseChainId: z.literal(84532), resolver: AddressSchema,
+  genlayerChainId: z.literal(61997), genlayerTxId: HashSchema, manifestHash: HashSchema, resolverReleaseId: HashSchema,
+  attempt: z.number().int().min(0).max(4), outcome: z.number().int().min(0).max(2), resultCommitment: HashSchema,
+});
+export const ResolutionRecordSchema = z.object({
+  resolverAddress: AddressSchema, manifestHash: HashSchema, genlayerTxId: HashSchema,
+  lifecycle: ResolutionStateSchema, executionStatus: ExecutionStateSchema, outcome: OutcomeSchema.optional(),
+  resultCommitment: HashSchema.optional(), attempt: z.number().int().min(0).max(4), submittedAt: z.string().datetime(), finalizedAt: z.string().datetime().optional(),
+});
+export const QuoteRequestSchema = z.object({ side: z.enum(["YES", "NO"]), action: z.enum(["BUY", "SELL"]), amount: AmountSchema });
+export const QuoteSchema = z.object({ shares: AmountSchema, notional: AmountSchema, fee: AmountSchema, total: AmountSchema, priceAfter: AmountSchema });
+export const TransactionPreparationSchema = z.object({ chainId: z.literal(84532), to: AddressSchema, data: z.string().regex(/^0x[a-fA-F0-9]*$/), value: z.literal("0") });
+export const ProposalSchema = ResolutionManifestSchema.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, lmsrB: AmountSchema.optional() });
+
+export type Engine = z.infer<typeof EngineSchema>;
+export type Outcome = z.infer<typeof OutcomeSchema>;
+export type Market = z.infer<typeof MarketSchema>;
+export type ResolutionManifest = z.infer<typeof ResolutionManifestSchema>;
+export type ResolutionEnvelope = z.infer<typeof ResolutionEnvelopeSchema>;
+export type ResolutionRecord = z.infer<typeof ResolutionRecordSchema>;
+export type QuoteRequest = z.infer<typeof QuoteRequestSchema>;
+export type Quote = z.infer<typeof QuoteSchema>;
+export type TransactionPreparation = z.infer<typeof TransactionPreparationSchema>;
+export type Proposal = z.infer<typeof ProposalSchema>;
+
+export function lmsrFundingTarget(bMicro: bigint): bigint {
+  const numerator = bMicro * 693147180559945309n * 110n;
+  const target = (numerator + 100n * 10n ** 18n - 1n) / (100n * 10n ** 18n);
+  return target > 100_000_000n ? target : 100_000_000n;
+}
+
+export function resolutionRetryAt(availableAtMs: number, evidenceAttempt: number): number {
+  const schedule = [0, 30 * 60, 4 * 3600, 24 * 3600, 72 * 3600] as const;
+  if (!Number.isInteger(evidenceAttempt) || evidenceAttempt < 0 || evidenceAttempt >= schedule.length) throw new Error("invalid evidence attempt");
+  return availableAtMs + schedule[evidenceAttempt] * 1000;
+}
+
+export function technicalRetryDelaySeconds(attempt: number): number {
+  if (!Number.isInteger(attempt) || attempt < 0) throw new Error("invalid technical attempt");
+  return [60, 300, 900, 3600, 21600][attempt] ?? 21600;
+}

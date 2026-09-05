@@ -12,21 +12,28 @@
 
 # ── Node ──────────────────────────────────────────────────────────────────────
 node_modules/
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+artifacts/
+.pnpm-store/
+.corepack/
+.turbo/
 npm-debug.log*
 yarn-error.log*
 
 # ── Next.js ───────────────────────────────────────────────────────────────────
-frontend/.next/
-frontend/out/
+apps/web/.next/
+apps/web/out/
 *.tsbuildinfo
 
 # ── Foundry / Solidity ────────────────────────────────────────────────────────
-contracts/arc/out/
-contracts/arc/cache/
-contracts/arc/broadcast/
+contracts/base/out/
+contracts/base/cache/
+contracts/base/broadcast/
 
 # ── Relayer build ─────────────────────────────────────────────────────────────
-relayer/dist/
 
 # ── Claude Code ───────────────────────────────────────────────────────────────
 .claude/

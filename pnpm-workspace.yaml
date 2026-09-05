@@ -2,3 +2,35 @@ packages:
   - apps/*
   - packages/*
   - workers/*
+
+overrides:
+  '@base-ui/react': 1.7.0
+  '@base-ui/utils': 0.3.2
+  'hono': 4.13.5
+  'jose@^6': 6.2.10
+  'react-aria': 3.52.0
+  'undici-types@^7': 7.29.0
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - genlayer
+  - prisma
+  - workerd
+
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@reown/appkit': false
+  bufferutil: false
+  cpu-features: false
+  esbuild: true
+  genlayer: true
+  keccak: false
+  keytar: false
+  prisma: true
+  protobufjs: false
+  ssh2: false
+  utf-8-validate: false
+  workerd: true

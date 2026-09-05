@@ -1,3 +1,12 @@
-import hashlib, json
-def canonical_manifest(value: dict) -> str: return json.dumps(value, sort_keys=True, separators=(",", ":"))
-def manifest_hash(value: dict) -> str: return "sha256:" + hashlib.sha256(canonical_manifest(value).encode()).hexdigest()
+import hashlib
+import json
+
+def canonical_manifest_body(value: dict) -> str:
+    body = {key: item for key, item in value.items() if key != "manifest_hash"}
+    return json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+def canonical_manifest_bytes(value: dict) -> bytes:
+    return canonical_manifest_body(value).encode("utf-8")
+
+def manifest_hash(value: dict) -> str:
+    return "0x" + hashlib.sha256(canonical_manifest_bytes(value)).hexdigest()

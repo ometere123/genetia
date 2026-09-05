@@ -16,7 +16,7 @@ interface IFeeRouter {
 }
 
 interface IOutcomeTokens {
-    function registerMarket(address market) external;
+    function registerMarket(address market, bytes32 marketId) external;
     function tokenIdFor(bytes32 marketId, uint8 outcome) external pure returns (uint256);
     function mint(address to, uint256 id, uint256 amount) external;
     function burn(address from, uint256 id, uint256 amount) external;

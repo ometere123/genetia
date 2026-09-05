@@ -44,9 +44,11 @@ describe("restart-safe transaction persistence", () => {
       getTransaction: vi.fn(async () => transaction("finalized")),
       debugTraceTransaction: vi.fn(async () => trace("YES")),
     };
-    expect(await submitOnce(client, store, { idempotencyKey: "market:attempt:0", resolver })).toBe(txId);
-    expect(await submitOnce(client, store, { idempotencyKey: "market:attempt:0", resolver })).toBe(txId);
+    const submission = { idempotencyKey: "market:attempt:0", resolver, marketId: "market-1", attempt: 0 };
+    expect(await submitOnce(client, store, submission)).toBe(txId);
+    expect(await submitOnce(client, store, submission)).toBe(txId);
     expect(client.writeContract).toHaveBeenCalledTimes(1);
+    expect(client.writeContract).toHaveBeenCalledWith({ address: resolver, functionName: "resolve", args: ["market-1", 0n] });
     expect((await followPersistedTransaction(client, store, "market:attempt:0")).txId).toBe(txId);
     expect(client.getTransaction).toHaveBeenCalledWith({ hash: txId });
   });

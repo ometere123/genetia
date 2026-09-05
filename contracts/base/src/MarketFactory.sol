@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {PoolMarket} from "./PoolMarket.sol";
 import {LMSRMarket} from "./LMSRMarket.sol";
 import {LMSRLiquidityVault} from "./LMSRLiquidityVault.sol";
@@ -63,7 +64,8 @@ contract MarketFactory is AccessControl {
 
     function createPool(MarketTerms calldata terms) external onlyRole(MARKET_CREATOR_ROLE) returns (address market) {
         _validate(terms);
-        PoolMarket instance = new PoolMarket(
+        bytes32 salt = _salt(terms);
+        PoolMarket instance = new PoolMarket{salt: salt}(
             terms.marketId,
             terms.financialReleaseId,
             usdc,
@@ -81,6 +83,14 @@ contract MarketFactory is AccessControl {
         markets[terms.marketId] = market;
         _register(terms, market);
         emit PoolCreated(terms.marketId, market, terms.financialReleaseId);
+    }
+
+    function predictPoolAddress(MarketTerms calldata terms) external view returns (address) {
+        bytes memory initCode = abi.encodePacked(
+            type(PoolMarket).creationCode,
+            abi.encode(terms.marketId, terms.financialReleaseId, usdc, terms.creator, address(feeRouter), address(riskManager), address(gateway), terms.manifestHash, terms.resolver, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline)
+        );
+        return Create2.computeAddress(_salt(terms), keccak256(initCode), address(this));
     }
 
     function createLMSR(MarketTerms calldata terms, uint256 b, uint256 fundingDeadline)
@@ -113,7 +123,7 @@ contract MarketFactory is AccessControl {
         vault = address(vaultInstance);
         instance.bindVault(vault);
         markets[terms.marketId] = market;
-        outcomeTokens.registerMarket(market);
+        outcomeTokens.registerMarket(market, terms.marketId);
         _register(terms, market);
         riskManager.registerComponent(vault);
         emit LMSRCreated(terms.marketId, market, vault, terms.financialReleaseId, b);
@@ -132,6 +142,10 @@ contract MarketFactory is AccessControl {
                 && terms.terminalDeadline == terms.resolutionAvailableTime + 96 hours,
             "time"
         );
+    }
+
+    function _salt(MarketTerms calldata terms) internal pure returns (bytes32) {
+        return keccak256(abi.encode("GENETIA_MARKET", terms.marketId, terms.financialReleaseId, terms.manifestHash));
     }
 
     function _register(MarketTerms calldata terms, address market) internal {

@@ -86,6 +86,14 @@ contract BaseLifecycleTest is Test {
         vm.prank(bob); token.approve(marketAddress, type(uint256).max);
     }
 
+    function testCreate2PoolPredictionEqualsDeployment() public {
+        MarketFactory.MarketTerms memory t = terms(keccak256("create2-pool"), POOL_RELEASE);
+        address predicted = factory.predictPoolAddress(t);
+        address deployed = factory.createPool(t);
+        assertEq(deployed, predicted);
+        assertEq(PoolMarket(deployed).releaseId(), POOL_RELEASE);
+    }
+
     function settle(address market, MarketFactory.MarketTerms memory t, uint8 result, uint256 signatures) internal {
         ResolutionGateway.ResolutionEnvelope memory e = ResolutionGateway.ResolutionEnvelope({
             marketId: t.marketId,

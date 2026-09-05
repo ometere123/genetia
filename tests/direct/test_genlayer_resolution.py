@@ -1,5 +1,6 @@
 import json
 import pytest
+from contracts.genlayer.manifest import manifest_hash
 
 
 def manifest(**changes):
@@ -14,14 +15,16 @@ def manifest(**changes):
         "authoritative_sources": [{"identity": "league", "exact_url": "https://official.example/final"}],
         "fallback_sources": [{"identity": "federation", "exact_url": "https://federation.example/final"}],
         "corroboration_rule": "one official source", "minimum_corroborating_sources": 1,
-        "arbitrary_caller_urls_forbidden": True, "manifest_hash": "sha256:locked",
+        "arbitrary_caller_urls_forbidden": True,
     }
     value.update(changes)
+    if "manifest_hash" not in changes:
+        value["manifest_hash"] = manifest_hash(value)
     return value
 
 
 def candidate(outcome, sources=("league",)):
-    return json.dumps({"manifest_hash": "sha256:locked", "outcome": outcome, "used_sources": list(sources), "facts": ["official final"]})
+    return json.dumps({"manifest_hash": manifest()["manifest_hash"], "outcome": outcome, "used_sources": list(sources), "facts": ["official final"]})
 
 
 def deploy_resolver(direct_deploy, direct_vm, data=None):
@@ -94,7 +97,7 @@ def test_undeclared_source_and_manifest_injection_rejected(direct_deploy, direct
     contract = deploy_resolver(direct_deploy, direct_vm)
     mock_sources(direct_vm); direct_vm.mock_llm(r"Independently resolve", candidate("YES"))
     contract.resolve("market-1", 0)
-    injected = {"manifest_hash": "sha256:locked", "outcome": "YES", "used_sources": ["attacker"], "facts": []}
+    injected = {"manifest_hash": manifest()["manifest_hash"], "outcome": "YES", "used_sources": ["attacker"], "facts": []}
     assert direct_vm.run_validator(leader_result=injected) is False
     injected["used_sources"] = ["league"]; injected["manifest_hash"] = "sha256:other"
     assert direct_vm.run_validator(leader_result=injected) is False
@@ -119,7 +122,31 @@ def test_fifth_persistent_unresolved_becomes_void(direct_deploy, direct_vm):
     data = manifest(fallback_sources=[], minimum_corroborating_sources=1)
     contract = deploy_resolver(direct_deploy, direct_vm, data)
     direct_vm.warp("2030-01-04T02:00:01Z")
+    for attempt in range(4):
+        assert contract.resolve("market-1", attempt) == "UNRESOLVED"
     assert contract.resolve("market-1", 4) == "VOID"
+
+
+def test_attempts_must_be_consumed_in_order(direct_deploy, direct_vm):
+    contract = deploy_resolver(direct_deploy, direct_vm, manifest(fallback_sources=[]))
+    with direct_vm.expect_revert("sequential"):
+        contract.resolve("market-1", 1)
+    direct_vm.warp("2030-01-01T00:15:00Z")
+    assert contract.resolve("market-1", 0) == "UNRESOLVED"
+    with direct_vm.expect_revert("too early"):
+        contract.resolve("market-1", 1)
+
+
+@pytest.mark.parametrize("outcome", ["YES", "NO", "VOID"])
+def test_terminal_outcome_stops_all_later_attempts(direct_deploy, direct_vm, outcome):
+    contract = deploy_resolver(direct_deploy, direct_vm)
+    mock_sources(direct_vm)
+    direct_vm.mock_llm(r"Independently resolve", candidate(outcome))
+    assert contract.resolve("market-1", 0) == outcome
+    direct_vm.clear_mocks()
+    direct_vm.warp("2030-01-04T02:00:01Z")
+    with direct_vm.expect_revert("terminal result"):
+        contract.resolve("market-1", 1)
 
 
 def test_too_early_wrong_market_and_duplicate_attempt_rejected(direct_deploy, direct_vm):

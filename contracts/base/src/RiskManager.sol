@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract RiskManager is AccessControl {
+    error ExposureAccountingInvariant(address market, uint256 requested, uint256 recorded);
     bytes32 public constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
     bytes32 public constant COMPONENT_ROLE = keccak256("COMPONENT_ROLE");
     uint256 public constant MARKET_CAP = 25_000e6;
@@ -58,9 +59,9 @@ contract RiskManager is AccessControl {
 
     function releaseExposure(address market, uint256 amount) external onlyRole(COMPONENT_ROLE) {
         uint256 current = marketExposure[market];
-        uint256 released = amount > current ? current : amount;
-        marketExposure[market] = current - released;
-        systemExposure -= released;
-        emit ExposureChanged(market, -int256(released), current - released, systemExposure);
+        if (amount > current) revert ExposureAccountingInvariant(market, amount, current);
+        marketExposure[market] = current - amount;
+        systemExposure -= amount;
+        emit ExposureChanged(market, -int256(amount), current - amount, systemExposure);
     }
 }

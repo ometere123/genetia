@@ -2,6 +2,7 @@
 from genlayer import *
 from datetime import datetime, timezone
 import json
+import hashlib
 
 OUTCOMES = ("YES", "NO", "VOID", "UNRESOLVED")
 
@@ -24,7 +25,9 @@ class MarketResolver(gl.Contract):
 
     def __init__(self, locked_manifest: str, locked_hash: str, release_id: str) -> None:
         data = json.loads(locked_manifest)
-        if data.get("manifest_hash") != locked_hash or not locked_hash: raise gl.vm.UserError("[EXPECTED] manifest hash mismatch")
+        canonical_body = json.dumps({key: value for key, value in data.items() if key != "manifest_hash"}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        computed_hash = "0x" + hashlib.sha256(canonical_body.encode("utf-8")).hexdigest()
+        if data.get("manifest_hash") != locked_hash or locked_hash != computed_hash: raise gl.vm.UserError("[EXPECTED] manifest hash mismatch")
         if data.get("genlayer_chain_id") != 61997 or data.get("base_chain_id") != 84532: raise gl.vm.UserError("[EXPECTED] wrong chain binding")
         if data.get("arbitrary_caller_urls_forbidden") is not True: raise gl.vm.UserError("[EXPECTED] source injection policy missing")
         self.manifest = locked_manifest; self.manifest_hash = locked_hash; self.market_id = str(data["market_id"])
@@ -34,12 +37,19 @@ class MarketResolver(gl.Contract):
     def resolve(self, market_id: str, attempt_number: u256) -> str:
         data = json.loads(self.manifest)
         if market_id != self.market_id: raise gl.vm.UserError("[EXPECTED] wrong market")
+        if self.status == "RESOLVED": raise gl.vm.UserError("[EXPECTED] terminal result already recorded")
         attempt = int(attempt_number)
         if attempt < 0 or attempt > 4: raise gl.vm.UserError("[EXPECTED] invalid evidence attempt")
         due = int(data["resolution_available_time"]) + [0, 1800, 14400, 86400, 259200][attempt]
         if int(datetime.now(timezone.utc).timestamp()) < due: raise gl.vm.UserError("[EXPECTED] resolution attempt too early")
         attempt_id = str(attempt)
         if self.attempts.get(attempt_id, ""): raise gl.vm.UserError("[EXPECTED] evidence attempt already consumed")
+        for previous in range(attempt):
+            previous_value = self.attempts.get(str(previous), "")
+            if not previous_value: raise gl.vm.UserError("[EXPECTED] evidence attempts must be sequential")
+            try: previous_outcome = json.loads(previous_value).get("outcome")
+            except Exception: previous_outcome = ""
+            if previous_outcome != "UNRESOLVED": raise gl.vm.UserError("[EXPECTED] terminal result already recorded")
         prompt = self._prompt(data, attempt)
         def independent():
             evidence = self._fetch_locked_evidence(data)

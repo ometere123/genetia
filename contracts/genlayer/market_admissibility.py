@@ -1,6 +1,7 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 from genlayer import *
 import json
+import hashlib
 
 DECISIONS = ("APPROVED", "NEEDS_REVISION", "REJECTED")
 PROFILES = ("STRUCTURED", "MULTI_SOURCE", "SEMANTIC", "COMPOSITE")
@@ -58,6 +59,9 @@ class MarketAdmissibility(gl.Contract):
         if data.get("arbitrary_caller_urls_forbidden") is not True: raise gl.vm.UserError("[EXPECTED] caller source injection must be forbidden")
         if data.get("resolution_available_time") < data.get("close_time"): raise gl.vm.UserError("[EXPECTED] resolution precedes close")
         if data.get("absolute_terminal_deadline") != data.get("resolution_available_time") + 345600: raise gl.vm.UserError("[EXPECTED] terminal deadline must be +96h")
+        canonical_body = json.dumps({key: value for key, value in data.items() if key != "manifest_hash"}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        expected_hash = "0x" + hashlib.sha256(canonical_body.encode("utf-8")).hexdigest()
+        if data.get("manifest_hash") != expected_hash: raise gl.vm.UserError("[EXPECTED] manifest hash mismatch")
         return data
 
     def _prompt(self, data) -> str:

@@ -30,6 +30,8 @@ export interface ResolutionClient {
 export interface ResolutionSubmission {
   idempotencyKey: string;
   resolver: Address;
+  marketId: string;
+  attempt: number;
 }
 
 function transactionHash(value: unknown): TransactionHash {
@@ -61,7 +63,7 @@ export async function submitOnce(
   const submitted = await client.writeContract({
     address: submission.resolver,
     functionName: "resolve",
-    args: [],
+    args: [submission.marketId, BigInt(submission.attempt)],
   });
   const txId = transactionHash(submitted);
   // This write is deliberately the first awaited operation after submission.

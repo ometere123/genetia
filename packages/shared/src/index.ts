@@ -19,10 +19,10 @@ export const EvidenceSourceSchema = z.object({
   allowed_path: z.string().optional(), source_type: z.string().min(1), priority: z.number().int().nonnegative(), required: z.boolean(),
 }).refine((source) => Boolean(source.exact_url || source.allowed_domain), "source requires an exact URL or locked domain");
 
-export const ResolutionManifestSchema = z.object({
+const ResolutionManifestBase = z.object({
   market_id: z.string().min(1), base_chain_id: z.literal(84532), base_market_address: AddressSchema,
   genlayer_chain_id: z.literal(61997), question: z.string().min(8), yes_definition: z.string().min(8), no_definition: z.string().min(8),
-  close_time: z.string().datetime(), resolution_available_time: z.string().datetime(), absolute_terminal_deadline: z.string().datetime(),
+  close_time: z.number().int().nonnegative(), resolution_available_time: z.number().int().nonnegative(), absolute_terminal_deadline: z.number().int().nonnegative(),
   evidence_attempt_schedule_seconds: z.tuple([z.literal(0), z.literal(1800), z.literal(14400), z.literal(86400), z.literal(259200)]),
   void_conditions: z.array(z.string().min(1)).min(1), resolution_profile: z.enum(["STRUCTURED", "MULTI_SOURCE", "SEMANTIC", "COMPOSITE"]),
   authoritative_sources: z.array(EvidenceSourceSchema).min(1), fallback_sources: z.array(EvidenceSourceSchema),
@@ -31,6 +31,7 @@ export const ResolutionManifestSchema = z.object({
   arbitrary_caller_urls_forbidden: z.literal(true), prompt_release_id: z.string().min(1), manifest_release_id: z.string().min(1),
   resolver_release_id: z.string().min(1), manifest_hash: HashSchema,
 });
+export const ResolutionManifestSchema = ResolutionManifestBase.refine((manifest) => manifest.absolute_terminal_deadline === manifest.resolution_available_time + 345600, "terminal deadline must be resolution availability plus 96 hours");
 
 export const MarketSchema = z.object({
   id: z.string(), marketId: z.string(), engine: EngineSchema, title: z.string(), question: z.string(), description: z.string(),
@@ -55,7 +56,7 @@ export const ResolutionRecordSchema = z.object({
 export const QuoteRequestSchema = z.object({ side: z.enum(["YES", "NO"]), action: z.enum(["BUY", "SELL"]), amount: AmountSchema });
 export const QuoteSchema = z.object({ shares: AmountSchema, notional: AmountSchema, fee: AmountSchema, total: AmountSchema, priceAfter: AmountSchema });
 export const TransactionPreparationSchema = z.object({ chainId: z.literal(84532), to: AddressSchema, data: z.string().regex(/^0x[a-fA-F0-9]*$/), value: z.literal("0") });
-export const ProposalSchema = ResolutionManifestSchema.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, lmsrB: AmountSchema.optional() });
+export const ProposalSchema = ResolutionManifestBase.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, lmsrB: AmountSchema.optional() });
 
 export type Engine = z.infer<typeof EngineSchema>;
 export type Outcome = z.infer<typeof OutcomeSchema>;
@@ -67,6 +68,22 @@ export type QuoteRequest = z.infer<typeof QuoteRequestSchema>;
 export type Quote = z.infer<typeof QuoteSchema>;
 export type TransactionPreparation = z.infer<typeof TransactionPreparationSchema>;
 export type Proposal = z.infer<typeof ProposalSchema>;
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>).filter(([key]) => key !== "manifest_hash").sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(",")}}`;
+  }
+  if (typeof value === "number" && (!Number.isSafeInteger(value) || !Number.isFinite(value))) throw new Error("canonical manifest numbers must be safe integers");
+  return JSON.stringify(value);
+}
+
+export function canonicalManifestBody(manifest: Record<string, unknown>): string { return stableJson(manifest); }
+export function canonicalManifestBytes(manifest: Record<string, unknown>): Uint8Array { return new TextEncoder().encode(canonicalManifestBody(manifest)); }
+export async function canonicalManifestHash(manifest: Record<string, unknown>): Promise<`0x${string}`> {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", canonicalManifestBytes(manifest));
+  return `0x${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as `0x${string}`;
+}
 
 export function lmsrFundingTarget(bMicro: bigint): bigint {
   const numerator = bMicro * 693147180559945309n * 110n;

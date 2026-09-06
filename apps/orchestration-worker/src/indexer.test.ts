@@ -122,4 +122,19 @@ describe("replayable Base event identity", () => {
     expect(persisted[0]?.transactionIndex).toBe(2);
     expect(advanced).toMatchObject({ nextBlock: 13n, lastBlockHash: `0x${"55".repeat(32)}` });
   });
+
+  it("persists only rebuildable projection records", async () => {
+    const calls: string[] = [];
+    const fake = { $transaction: async (callback: (tx: unknown) => Promise<void>) => callback({
+      derivedProjection: {
+        deleteMany: async () => { calls.push("delete"); },
+        createMany: async (args: { data: unknown[] }) => { calls.push(`create:${args.data.length}`); },
+      },
+    }) } as never;
+    const repository = new GenetiaRepositories(fake);
+    const marketId = "0x" + "33".repeat(32);
+    const projected = projectEvents(indexEvents([], [{ ...event(`0x${"30".repeat(32)}`, 0, 1n, { marketId, market: `0x${"44".repeat(20)}`, releaseId: "pool-a" }), eventName: "PoolCreated", contractAddress: `0x${"55".repeat(20)}` }]));
+    await expect(repository.replaceProjection(projected)).resolves.toBe(2);
+    expect(calls).toEqual(["delete", "create:2"]);
+  });
 });

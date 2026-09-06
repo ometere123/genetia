@@ -28,3 +28,24 @@ export function indexEvents(existing: readonly IndexedChainEvent[], incoming: re
 export function rebuildFromDeploymentBlock(events: readonly ChainEventInput[], deploymentBlock: bigint): IndexedChainEvent[] {
   return indexEvents([], events.filter((event) => event.blockNumber >= deploymentBlock));
 }
+
+export type IndexedCursor = { deploymentBlock: bigint; nextBlock: bigint; lastBlockHash?: `0x${string}` | null };
+
+/** Finds the highest indexed common ancestor using the node's canonical block hashes. */
+export function findReorgRollbackPoint(
+  events: readonly IndexedChainEvent[],
+  cursor: IndexedCursor,
+  canonicalHashes: ReadonlyMap<bigint, `0x${string}`>,
+): bigint | null {
+  if (!cursor.lastBlockHash || cursor.nextBlock <= cursor.deploymentBlock) return null;
+  for (let block = cursor.nextBlock - 1n; block >= cursor.deploymentBlock; block--) {
+    const canonical = canonicalHashes.get(block);
+    const indexed = events.find((event) => event.blockNumber === block)?.blockHash;
+    if (canonical && indexed && canonical.toLowerCase() === indexed.toLowerCase()) return block;
+  }
+  return cursor.deploymentBlock - 1n;
+}
+
+export function rollbackToBlock(events: readonly IndexedChainEvent[], rollbackBlock: bigint): IndexedChainEvent[] {
+  return events.filter((event) => event.blockNumber <= rollbackBlock);
+}

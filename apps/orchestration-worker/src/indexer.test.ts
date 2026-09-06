@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { chainEventIdentity, indexEvents, rebuildFromDeploymentBlock, type ChainEventInput } from "../../../packages/db/src/indexer.js";
+import { chainEventIdentity, findReorgRollbackPoint, indexEvents, rebuildFromDeploymentBlock, rollbackToBlock, type ChainEventInput } from "../../../packages/db/src/indexer.js";
 import { GenetiaRepositories } from "../../../packages/db/src/repositories.js";
+import { decodeBaseLog } from "../../../packages/db/src/base-events.js";
+import { encodeAbiParameters, keccak256, parseAbiParameters, toHex, toBytes } from "viem";
 
 const event = (tx: `0x${string}`, logIndex: number, blockNumber: bigint, payload: Record<string, unknown> = {}): ChainEventInput => ({
   chainId: 84532,
@@ -46,5 +48,28 @@ describe("replayable Base event identity", () => {
     const serialise = (value: unknown) => JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item);
     expect(serialise(calls[0])).toContain("skipDuplicates");
     expect(serialise(calls[1])).toContain("nextBlock");
+  });
+
+  it("decodes a Solidity event through the ABI and ignores unknown logs", () => {
+    const account = `0x${"11".repeat(20)}` as `0x${string}`;
+    const signature = keccak256(toBytes("Staked(address,bool,uint256)"));
+    const indexed = encodeAbiParameters(parseAbiParameters(["address", "bool"]), [account, true]);
+    const amount = encodeAbiParameters(parseAbiParameters(["uint256"]), [123n]);
+    const decoded = decodeBaseLog({
+      address: `0x${"22".repeat(20)}`, topics: [signature, `0x${indexed.slice(2, 66)}`, `0x${indexed.slice(66)}`], data: amount,
+      transactionHash: `0x${"33".repeat(32)}`, blockHash: `0x${"44".repeat(32)}`, blockNumber: 42n, logIndex: 0,
+    });
+    expect(decoded?.eventName).toBe("Staked");
+    expect(decoded?.payload).toMatchObject({ account, yes: true, amount: "123" });
+    expect(decodeBaseLog({ address: `0x${"22".repeat(20)}`, topics: [toHex("unknown")], data: "0x", transactionHash: `0x${"33".repeat(32)}`, blockHash: `0x${"44".repeat(32)}`, blockNumber: 42n, logIndex: 1 })).toBeNull();
+  });
+
+  it("detects a changed canonical block hash and rolls back only the orphaned suffix", () => {
+    const first = event(`0x${"06".repeat(32)}`, 0, 20n);
+    const second = { ...event(`0x${"07".repeat(32)}`, 0, 21n), blockHash: `0x${"ef".repeat(32)}` as `0x${string}` };
+    const indexed = indexEvents([], [first, second]);
+    const rollback = findReorgRollbackPoint(indexed, { deploymentBlock: 20n, nextBlock: 22n, lastBlockHash: second.blockHash }, new Map([[20n, first.blockHash], [21n, `0x${"aa".repeat(32)}`]]));
+    expect(rollback).toBe(20n);
+    expect(rollbackToBlock(indexed, rollback!)).toEqual([indexed[0]]);
   });
 });

@@ -2,5 +2,27 @@ name = "genetia-orchestration"
 main = "src/index.ts"
 compatibility_date = "2026-09-04"
 compatibility_flags = ["nodejs_compat"]
-[triggers]
-crons = ["* * * * *"]
+
+[[queues.producers]]
+binding = "GENETIA_JOBS"
+queue = "genetia-work-items"
+
+[[queues.consumers]]
+queue = "genetia-work-items"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "genetia-work-items-dlq"
+
+[[queues.producers]]
+binding = "GENETIA_DLQ"
+queue = "genetia-work-items-dlq"
+
+[[workflows]]
+name = "genetia-lifecycle"
+binding = "GENETIA_WORKFLOWS"
+class_name = "GenetiaLifecycleWorkflow"
+
+# Hyperdrive is bound at deployment after the account-owned resource ID is
+# provisioned. No fabricated ID is committed here; local code uses the same
+# GENETIA_DB binding shape and dry-runs remain deployment-safe.

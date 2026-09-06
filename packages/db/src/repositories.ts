@@ -1,5 +1,6 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 import type { ChainEventInput, IndexedChainEvent } from "./indexer";
+import type { ProjectionState } from "./projections";
 
 /**
  * Persistence boundary for indexed/application data. No method here computes
@@ -49,5 +50,25 @@ export class GenetiaRepositories {
 
   async advanceCursor(cursor: { chainId: number; deploymentBlock: bigint; nextBlock: bigint; lastBlockHash: string }) {
     return this.db.indexerCursor.upsert({ where: { chainId: cursor.chainId }, create: cursor, update: { nextBlock: cursor.nextBlock, lastBlockHash: cursor.lastBlockHash } });
+  }
+
+  /** Replaces rebuildable read projections; this is never a cash ledger. */
+  async replaceProjection(state: ProjectionState) {
+    const marketRows = Object.entries(state.markets).flatMap(([marketId, market]) => [
+      { projectionKey: `market:${marketId}`, kind: "market", marketId, payload: market },
+      ...Object.entries(market.positions).map(([walletAddress, payload]) => ({ projectionKey: `position:${marketId}:${walletAddress.toLowerCase()}`, kind: "position", marketId, walletAddress, payload })),
+      ...Object.entries(market.lp).map(([walletAddress, payload]) => ({ projectionKey: `lp:${marketId}:${walletAddress.toLowerCase()}`, kind: "lp", marketId, walletAddress, payload })),
+    ]);
+    const rows = [
+      ...marketRows,
+      ...Object.entries(state.proposals).map(([proposalId, payload]) => ({ projectionKey: `proposal:${proposalId}`, kind: "proposal", payload })),
+      ...Object.entries(state.releases).map(([releaseId, payload]) => ({ projectionKey: `release:${releaseId}`, kind: "release", payload })),
+      ...state.history.map((payload) => ({ projectionKey: `history:${payload.identity}`, kind: "history", marketId: payload.marketAddress, payload })),
+    ];
+    await this.db.$transaction(async (tx) => {
+      await tx.derivedProjection.deleteMany();
+      if (rows.length) await tx.derivedProjection.createMany({ data: rows as Prisma.DerivedProjectionCreateManyInput[] });
+    });
+    return rows.length;
   }
 }

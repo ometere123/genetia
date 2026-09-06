@@ -283,3 +283,15 @@ model WorkflowState {
   updatedAt      DateTime @updatedAt
   @@index([state, nextRunAt])
 }
+
+/// Rebuildable query projection. It is never a source of truth for funds.
+model DerivedProjection {
+  projectionKey String   @id
+  kind          String
+  marketId      String?
+  walletAddress String?
+  payload       Json
+  updatedAt     DateTime @updatedAt
+  @@index([kind, marketId])
+  @@index([walletAddress, kind])
+}

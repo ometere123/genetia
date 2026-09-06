@@ -79,11 +79,23 @@ class MarketResolver(gl.Contract):
     def _fetch_locked_evidence(self, data):
         evidence = []
         for source in (data.get("authoritative_sources", []) + data.get("fallback_sources", []))[:12]:
-            identity = str(source.get("identity", "")); url = str(source.get("exact_url", ""))
+            identity = str(source.get("identity", "")); url = self._locked_source_url(source)
             if not identity or not url: continue
             try: evidence.append({"identity": identity, "url": url, "available": True, "content": str(gl.nondet.web.render(url, mode="text"))[:6000]})
             except Exception: evidence.append({"identity": identity, "url": url, "available": False, "content": ""})
         return evidence
+
+    def _locked_source_url(self, source):
+        exact = str(source.get("exact_url", ""))
+        if exact:
+            return exact
+        domain = str(source.get("allowed_domain", "")).lower().strip()
+        path = str(source.get("allowed_path", ""))
+        if not domain or not path.startswith("/") or " " in domain or ":" in domain:
+            return ""
+        # Discovery is constrained to the precommitted domain/path. The
+        # page may be absent at deployment and become available later.
+        return "https://" + domain + path
 
     def _policy_valid(self, candidate, data) -> bool:
         if not isinstance(candidate, dict) or candidate.get("manifest_hash") != self.manifest_hash or candidate.get("outcome") not in OUTCOMES: return False

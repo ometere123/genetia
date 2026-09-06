@@ -17,7 +17,8 @@ export const AmountSchema = z.string().regex(/^\d+$/);
 export const EvidenceSourceSchema = z.object({
   identity: z.string().min(1), exact_url: z.string().url().optional(), allowed_domain: z.string().min(1).optional(),
   allowed_path: z.string().optional(), source_type: z.string().min(1), priority: z.number().int().nonnegative(), required: z.boolean(),
-}).refine((source) => Boolean(source.exact_url || source.allowed_domain), "source requires an exact URL or locked domain");
+}).refine((source) => Boolean(source.exact_url || source.allowed_domain), "source requires an exact URL or locked domain")
+  .refine((source) => !source.allowed_domain || Boolean(source.allowed_path), "future source requires a locked path");
 
 const ResolutionManifestBase = z.object({
   market_id: z.string().min(1), base_chain_id: z.literal(84532), base_market_address: AddressSchema,
@@ -46,7 +47,7 @@ export const MarketSchema = z.object({
 export const ResolutionEnvelopeSchema = z.object({
   marketId: HashSchema, baseMarket: AddressSchema, baseChainId: z.literal(84532), resolver: AddressSchema,
   genlayerChainId: z.literal(61997), genlayerTxId: HashSchema, manifestHash: HashSchema, resolverReleaseId: HashSchema,
-  attempt: z.number().int().min(0).max(4), outcome: z.number().int().min(0).max(2), resultCommitment: HashSchema,
+  attempt: z.number().int().min(0).max(4), outcome: z.number().int().min(0).max(2), evidenceCommitment: HashSchema, resultCommitment: HashSchema,
 });
 export const ResolutionRecordSchema = z.object({
   resolverAddress: AddressSchema, manifestHash: HashSchema, genlayerTxId: HashSchema,

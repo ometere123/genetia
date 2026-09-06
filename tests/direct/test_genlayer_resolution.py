@@ -23,8 +23,9 @@ def manifest(**changes):
     return value
 
 
-def candidate(outcome, sources=("league",)):
-    return json.dumps({"manifest_hash": manifest()["manifest_hash"], "outcome": outcome, "used_sources": list(sources), "facts": ["official final"]})
+def candidate(outcome, sources=("league",), manifest_data=None):
+    locked = manifest_data or manifest()
+    return json.dumps({"manifest_hash": locked["manifest_hash"], "outcome": outcome, "used_sources": list(sources), "facts": ["official final"]})
 
 
 def deploy_resolver(direct_deploy, direct_vm, data=None):
@@ -147,6 +148,17 @@ def test_terminal_outcome_stops_all_later_attempts(direct_deploy, direct_vm, out
     direct_vm.warp("2030-01-04T02:00:01Z")
     with direct_vm.expect_revert("terminal result"):
         contract.resolve("market-1", 1)
+
+
+def test_future_locked_source_page_is_resolved_without_exact_url(direct_deploy, direct_vm):
+    data = manifest(authoritative_sources=[{
+        "identity": "league", "allowed_domain": "official.example", "allowed_path": "/future-final",
+        "source_type": "official", "priority": 0, "required": True,
+    }])
+    contract = deploy_resolver(direct_deploy, direct_vm, data)
+    direct_vm.mock_web(r"official\.example/future-final", {"status": 200, "body": "Example FC won"})
+    direct_vm.mock_llm(r"Independently resolve", candidate("YES", manifest_data=data))
+    assert contract.resolve("market-1", 0) == "YES"
 
 
 def test_too_early_wrong_market_and_duplicate_attempt_rejected(direct_deploy, direct_vm):

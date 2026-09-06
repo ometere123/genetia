@@ -2,7 +2,7 @@ import { abi as genlayerAbi } from "genlayer-js";
 import type { DebugTraceResult, GenLayerTransaction, TransactionHash } from "genlayer-js/types";
 import { bytesToHex, type Address } from "viem";
 import { describe, expect, it, vi } from "vitest";
-import { classifyFinality, followPersistedTransaction, submitOnce, type AttemptStore, type ResolutionAttemptState } from "./genlayer-lifecycle.js";
+import { classifyFinality, followPersistedTransaction, resolutionIdempotencyKey, submitOnce, type AttemptStore, type ResolutionAttemptState } from "./genlayer-lifecycle.js";
 
 const txId = (`0x${"12".repeat(32)}`) as TransactionHash;
 const resolver = (`0x${"34".repeat(20)}`) as Address;
@@ -31,6 +31,11 @@ describe("Studio Dev finality boundary", () => {
 });
 
 describe("restart-safe transaction persistence", () => {
+  it("derives one stable key for every market attempt", () => {
+    expect(resolutionIdempotencyKey("market-1", 0)).toBe("resolution:market-1:attempt:0");
+    expect(resolutionIdempotencyKey("market-1", 0)).toBe(resolutionIdempotencyKey("market-1", 0));
+  });
+
   it("persists the returned ID immediately and resumes that same ID", async () => {
     let state: ResolutionAttemptState | null = null;
     const store: AttemptStore = {
@@ -51,5 +56,23 @@ describe("restart-safe transaction persistence", () => {
     expect(client.writeContract).toHaveBeenCalledWith({ address: resolver, functionName: "resolve", args: ["market-1", 0n] });
     expect((await followPersistedTransaction(client, store, "market:attempt:0")).txId).toBe(txId);
     expect(client.getTransaction).toHaveBeenCalledWith({ hash: txId });
+  });
+
+  it("does not allow a second durable claimant to submit", async () => {
+    let state: ResolutionAttemptState | null = null;
+    let claimed = false;
+    const store: AttemptStore = {
+      load: async () => state,
+      createIfAbsent: async (initial) => state ??= initial,
+      claimSubmission: async () => { if (claimed) return false; claimed = true; return true; },
+      persistSubmission: async (_key, hash, submittedAt) => { state = { ...state!, genlayerTxId: hash, submittedAt, lifecycle: "SUBMITTED" }; },
+      persistObservation: async (_key, patch) => { state = { ...state!, ...patch }; },
+    };
+    const client = { writeContract: vi.fn(async () => ({ hash: txId })), getTransaction: vi.fn(), debugTraceTransaction: vi.fn() };
+    const submission = { idempotencyKey: "market:attempt:1", resolver, marketId: "market-1", attempt: 1 };
+    await expect(submitOnce(client, store, submission)).resolves.toBe(txId);
+    const second = await submitOnce(client, store, submission);
+    expect(second).toBe(txId);
+    expect(client.writeContract).toHaveBeenCalledTimes(1);
   });
 });

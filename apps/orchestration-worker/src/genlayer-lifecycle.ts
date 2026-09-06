@@ -17,6 +17,8 @@ export interface ResolutionAttemptState {
 export interface AttemptStore {
   load(idempotencyKey: string): Promise<ResolutionAttemptState | null>;
   createIfAbsent(state: ResolutionAttemptState): Promise<ResolutionAttemptState>;
+  /** Atomically changes READY -> SUBMITTING. Implementations must do this in durable storage. */
+  claimSubmission?: (idempotencyKey: string) => Promise<boolean>;
   persistSubmission(idempotencyKey: string, txId: TransactionHash, submittedAt: string): Promise<void>;
   persistObservation(idempotencyKey: string, patch: Partial<ResolutionAttemptState>): Promise<void>;
 }
@@ -32,6 +34,11 @@ export interface ResolutionSubmission {
   resolver: Address;
   marketId: string;
   attempt: number;
+}
+
+export function resolutionIdempotencyKey(marketId: string, attempt: number): string {
+  if (!marketId || !Number.isInteger(attempt) || attempt < 0) throw new Error("invalid resolution identity");
+  return `resolution:${marketId}:attempt:${attempt}`;
 }
 
 function transactionHash(value: unknown): TransactionHash {
@@ -59,6 +66,16 @@ export async function submitOnce(
     lifecycle: "READY",
   });
   if (state.genlayerTxId) return state.genlayerTxId;
+
+  // A durable claim closes the only safe coordination boundary before an
+  // external submission. Stores backed by WorkflowState implement this as a
+  // conditional UPDATE; an in-memory fallback is retained for existing local
+  // adapters, but is never the production coordination primitive.
+  if (store.claimSubmission && !(await store.claimSubmission(submission.idempotencyKey))) {
+    const concurrent = await store.load(submission.idempotencyKey);
+    if (concurrent?.genlayerTxId) return concurrent.genlayerTxId;
+    throw new Error("resolution submission is already owned by another worker");
+  }
 
   const submitted = await client.writeContract({
     address: submission.resolver,

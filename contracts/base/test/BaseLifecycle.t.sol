@@ -12,6 +12,8 @@ import {MarketFactory} from "../src/MarketFactory.sol";
 import {PoolMarket} from "../src/PoolMarket.sol";
 import {LMSRMarket} from "../src/LMSRMarket.sol";
 import {LMSRLiquidityVault} from "../src/LMSRLiquidityVault.sol";
+import {PoolReleaseDeployer} from "../src/PoolReleaseDeployer.sol";
+import {LMSRReleaseDeployer} from "../src/LMSRReleaseDeployer.sol";
 
 contract BaseLifecycleTest is Test {
     MockUSDC token;
@@ -46,8 +48,10 @@ contract BaseLifecycleTest is Test {
         fees.setFactory(address(factory));
         outcomes.setFactory(address(factory));
         gateway.setFactory(address(factory));
-        registry.registerRelease(POOL_RELEASE, address(0x1001), keccak256("pool-code"), keccak256("commit"));
-        registry.registerRelease(LMSR_RELEASE, address(0x1002), keccak256("lmsr-code"), keccak256("commit"));
+        PoolReleaseDeployer poolRelease = new PoolReleaseDeployer();
+        registry.registerRelease(POOL_RELEASE, address(poolRelease), keccak256("pool-code"), keccak256("commit"));
+        LMSRReleaseDeployer lmsrRelease = new LMSRReleaseDeployer();
+        registry.registerRelease(LMSR_RELEASE, address(lmsrRelease), keccak256("lmsr-code"), keccak256("commit"));
         token.mint(alice, 100_000e6);
         token.mint(bob, 100_000e6);
         vm.prank(alice); token.approve(address(factory), type(uint256).max);
@@ -94,6 +98,17 @@ contract BaseLifecycleTest is Test {
         assertEq(PoolMarket(deployed).releaseId(), POOL_RELEASE);
     }
 
+    function testCreate2LMSRPairPredictionEqualsDeployment() public {
+        MarketFactory.MarketTerms memory t = terms(keccak256("create2-lmsr"), LMSR_RELEASE);
+        uint256 b = 250e6;
+        uint256 deadline = block.timestamp + 12 hours;
+        (address predictedMarket, address predictedVault) = factory.predictLMSRAddresses(t, b, deadline);
+        (address deployedMarket, address deployedVault) = factory.createLMSR(t, b, deadline);
+        assertEq(deployedMarket, predictedMarket);
+        assertEq(deployedVault, predictedVault);
+        assertEq(LMSRMarket(deployedMarket).releaseId(), LMSR_RELEASE);
+    }
+
     function settle(address market, MarketFactory.MarketTerms memory t, uint8 result, uint256 signatures) internal {
         ResolutionGateway.ResolutionEnvelope memory e = ResolutionGateway.ResolutionEnvelope({
             marketId: t.marketId,
@@ -106,6 +121,7 @@ contract BaseLifecycleTest is Test {
             resolverReleaseId: t.resolverReleaseId,
             attempt: 0,
             outcome: result,
+            evidenceCommitment: keccak256(abi.encode(t.marketId, result, "evidence")),
             resultCommitment: keccak256(abi.encode(t.marketId, result, "result"))
         });
         bytes32 d = gateway.digest(e);
@@ -217,6 +233,21 @@ contract BaseLifecycleTest is Test {
         vm.prank(alice); assertGt(vault.withdrawTerminal(100e6), 0);
     }
 
+    function testLMSRVoidOddMicroUnitDustHasExplicitTerminalDestination() public {
+        (LMSRMarket market, LMSRLiquidityVault vault, MarketFactory.MarketTerms memory t) =
+            createLMSR(keccak256("lmsr-void-dust"), 100e6);
+        vm.prank(alice); vault.contribute(100e6); vault.activate();
+        vm.prank(bob); market.buy(1, 1_000_001, type(uint256).max);
+        vm.warp(t.resolutionAvailableTime); settle(address(market), t, 2, 3);
+        vm.prank(bob); assertEq(market.redeem(1_000_001, 0), 500_000);
+        assertEq(market.qYes(), 0);
+        uint256 before = token.balanceOf(address(vault));
+        assertEq(market.releaseVoidDust(), 1);
+        assertEq(market.voidDustReleased(), true);
+        assertEq(token.balanceOf(address(vault)), before + 1);
+        assertEq(token.balanceOf(address(market)), 0);
+    }
+
     function testLMSRExpiryCannotBeReplaced() public {
         (LMSRMarket market, LMSRLiquidityVault vault, MarketFactory.MarketTerms memory t) =
             createLMSR(keccak256("lmsr-expire"), 100e6);
@@ -297,6 +328,7 @@ contract BaseLifecycleTest is Test {
             marketId: t.marketId, baseMarket: address(market), baseChainId: block.chainid, resolver: t.resolver,
             genlayerChainId: 61997, genlayerTxId: keccak256("dup-tx"), manifestHash: t.manifestHash,
             resolverReleaseId: t.resolverReleaseId, attempt: 0, outcome: 2,
+            evidenceCommitment: keccak256("dup-evidence"),
             resultCommitment: keccak256("dup-result")
         });
         bytes32 d = gateway.digest(e);

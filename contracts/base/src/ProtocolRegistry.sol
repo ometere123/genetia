@@ -15,6 +15,7 @@ contract ProtocolRegistry is AccessControl {
     bytes32 public defaultPoolRelease;
     bytes32 public defaultLMSRRelease;
     event ReleaseRegistered(bytes32 indexed releaseId, address implementation, bytes32 bytecodeHash, bytes32 commitSha);
+    event ReleaseActivationChanged(bytes32 indexed releaseId, bool active);
 
     constructor(address safe) {
         _grantRole(DEFAULT_ADMIN_ROLE, safe);
@@ -35,6 +36,13 @@ contract ProtocolRegistry is AccessControl {
         require(releases[pool].active && releases[lmsr].active, "release inactive");
         defaultPoolRelease = pool;
         defaultLMSRRelease = lmsr;
+    }
+
+    /// @notice Disables creation for a release without changing deployed markets.
+    function setReleaseActive(bytes32 releaseId, bool active) external onlyRole(RELEASE_ADMIN_ROLE) {
+        require(releases[releaseId].implementation != address(0), "unknown release");
+        releases[releaseId].active = active;
+        emit ReleaseActivationChanged(releaseId, active);
     }
 
     function isActive(bytes32 releaseId) external view returns (bool) {

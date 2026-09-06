@@ -1,7 +1,7 @@
 import { abi as genlayerAbi, createClient, isSuccessful } from "genlayer-js";
 import { studioDevnet } from "genlayer-js/chains";
 import type { GenLayerTransaction, TransactionHash } from "genlayer-js/types";
-import { hexToBytes, isAddress, keccak256, type Address, type Hex } from "viem";
+import { encodeAbiParameters, hexToBytes, isAddress, keccak256, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const STUDIO_DEV_RPC = "https://studio-dev.genlayer.com/api";
@@ -12,7 +12,7 @@ export interface Env { WATCHER_ID: string; WATCHER_PRIVATE_KEY: Hex; GENLAYER_RP
 export type ResolutionEnvelope = {
   marketId: Hex; baseMarket: Address; baseChainId: 84532; resolver: Address;
   genlayerChainId: 61997; genlayerTxId: Hex; manifestHash: Hex; resolverReleaseId: Hex;
-  attempt: number; outcome: 0 | 1 | 2; resultCommitment: Hex; gateway: Address;
+  attempt: number; outcome: 0 | 1 | 2; evidenceCommitment: Hex; resultCommitment: Hex; gateway: Address;
 };
 type Trace = { result_code: number; return_data: string; stderr: string };
 
@@ -35,7 +35,15 @@ export function assertWatcherEligible(transaction: GenLayerTransaction, trace: T
   if (!isSuccessful(transaction) || transaction.txExecutionResultName !== "FINISHED_WITH_RETURN") throw new Error("GenLayer execution was not successful");
   if (trace.result_code !== 1 || trace.stderr.length !== 0) throw new Error("GenVM trace was not successful");
   if (decodeFinalOutcome(trace.return_data) !== envelope.outcome) throw new Error("altered outcome");
-  if (keccak256(trace.return_data as Hex) !== envelope.resultCommitment) throw new Error("wrong result commitment");
+  if (keccak256(trace.return_data as Hex) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
+  if (finalizedResolutionCommitment(envelope) !== envelope.resultCommitment) throw new Error("wrong result commitment");
+}
+
+export function finalizedResolutionCommitment(envelope: ResolutionEnvelope): Hex {
+  return keccak256(encodeAbiParameters(
+    [{ type: "bytes32" }, { type: "address" }, { type: "uint256" }, { type: "uint256" }, { type: "address" }, { type: "bytes32" }, { type: "bytes32" }, { type: "bytes32" }, { type: "uint8" }, { type: "uint8" }, { type: "bytes32" }],
+    [envelope.marketId, envelope.baseMarket, BigInt(envelope.baseChainId), BigInt(envelope.genlayerChainId), envelope.resolver, envelope.resolverReleaseId, envelope.manifestHash, envelope.genlayerTxId, envelope.attempt, envelope.outcome, envelope.evidenceCommitment],
+  ));
 }
 
 const envelopeTypes = { ResolutionEnvelope: [
@@ -44,7 +52,7 @@ const envelopeTypes = { ResolutionEnvelope: [
   { name: "genlayerChainId", type: "uint256" }, { name: "genlayerTxId", type: "bytes32" },
   { name: "manifestHash", type: "bytes32" }, { name: "resolverReleaseId", type: "bytes32" },
   { name: "attempt", type: "uint8" }, { name: "outcome", type: "uint8" },
-  { name: "resultCommitment", type: "bytes32" },
+  { name: "evidenceCommitment", type: "bytes32" }, { name: "resultCommitment", type: "bytes32" },
 ] } as const;
 
 export async function attest(envelope: ResolutionEnvelope, env: Env) {

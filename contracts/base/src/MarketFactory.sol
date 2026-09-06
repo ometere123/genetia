@@ -10,6 +10,14 @@ import {IOutcomeTokens, IFeeRouter, IRiskManager, IResolutionGateway} from "./in
 
 interface IProtocolRegistry {
     function isActive(bytes32 releaseId) external view returns (bool);
+    function releases(bytes32 releaseId) external view returns (address implementation, bytes32 bytecodeHash, bytes32 commitSha, bool active);
+}
+
+interface IPoolReleaseDeployer {
+    function deployPool(bytes32, bytes32, address, address, address, address, address, bytes32, address, uint256, uint256, uint256, bytes32) external returns (address);
+}
+interface ILMSRReleaseDeployer {
+    function deployLMSR(bytes32, bytes32, address, address, address, address, address, address, bytes32, address, uint256, uint256, uint256, uint256, uint256, bytes32, bytes32) external returns (address, address);
 }
 
 contract MarketFactory is AccessControl {
@@ -64,33 +72,33 @@ contract MarketFactory is AccessControl {
 
     function createPool(MarketTerms calldata terms) external onlyRole(MARKET_CREATOR_ROLE) returns (address market) {
         _validate(terms);
-        bytes32 salt = _salt(terms);
-        PoolMarket instance = new PoolMarket{salt: salt}(
-            terms.marketId,
-            terms.financialReleaseId,
-            usdc,
-            terms.creator,
-            address(feeRouter),
-            address(riskManager),
-            address(gateway),
-            terms.manifestHash,
-            terms.resolver,
-            terms.closeTime,
-            terms.resolutionAvailableTime,
-            terms.terminalDeadline
+        (address implementation,,,) = registry.releases(terms.financialReleaseId);
+        require(implementation.code.length > 0, "release deployer");
+        market = IPoolReleaseDeployer(implementation).deployPool(
+            terms.marketId, terms.financialReleaseId, usdc, terms.creator, address(feeRouter), address(riskManager),
+            address(gateway), terms.manifestHash, terms.resolver, terms.closeTime, terms.resolutionAvailableTime,
+            terms.terminalDeadline, _salt(terms)
         );
-        market = address(instance);
         markets[terms.marketId] = market;
         _register(terms, market);
         emit PoolCreated(terms.marketId, market, terms.financialReleaseId);
     }
 
     function predictPoolAddress(MarketTerms calldata terms) external view returns (address) {
+        (address implementation,,,) = registry.releases(terms.financialReleaseId);
         bytes memory initCode = abi.encodePacked(
             type(PoolMarket).creationCode,
             abi.encode(terms.marketId, terms.financialReleaseId, usdc, terms.creator, address(feeRouter), address(riskManager), address(gateway), terms.manifestHash, terms.resolver, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline)
         );
-        return Create2.computeAddress(_salt(terms), keccak256(initCode), address(this));
+        return Create2.computeAddress(_salt(terms), keccak256(initCode), implementation);
+    }
+
+    function predictLMSRAddresses(MarketTerms calldata terms, uint256 b, uint256 fundingDeadline) external view returns (address market, address vault) {
+        (address implementation,,,) = registry.releases(terms.financialReleaseId);
+        bytes memory marketCode = abi.encodePacked(type(LMSRMarket).creationCode, abi.encode(terms.marketId, terms.financialReleaseId, usdc, address(outcomeTokens), address(feeRouter), address(riskManager), address(gateway), terms.creator, terms.manifestHash, terms.resolver, b, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline));
+        market = Create2.computeAddress(_lmsrMarketSalt(terms), keccak256(marketCode), implementation);
+        bytes memory vaultCode = abi.encodePacked(type(LMSRLiquidityVault).creationCode, abi.encode(usdc, market, address(riskManager), _fundingTarget(b), fundingDeadline));
+        vault = Create2.computeAddress(_vaultSalt(terms), keccak256(vaultCode), implementation);
     }
 
     function createLMSR(MarketTerms calldata terms, uint256 b, uint256 fundingDeadline)
@@ -100,28 +108,13 @@ contract MarketFactory is AccessControl {
     {
         _validate(terms);
         require(fundingDeadline > block.timestamp && fundingDeadline <= terms.closeTime, "funding deadline");
-        LMSRMarket instance = new LMSRMarket(
-            terms.marketId,
-            terms.financialReleaseId,
-            usdc,
-            address(outcomeTokens),
-            address(feeRouter),
-            address(riskManager),
-            address(gateway),
-            terms.creator,
-            terms.manifestHash,
-            terms.resolver,
-            b,
-            terms.closeTime,
-            terms.resolutionAvailableTime,
-            terms.terminalDeadline
+        (address implementation,,,) = registry.releases(terms.financialReleaseId);
+        require(implementation.code.length > 0, "release deployer");
+        (market, vault) = ILMSRReleaseDeployer(implementation).deployLMSR(
+            terms.marketId, terms.financialReleaseId, usdc, address(outcomeTokens), address(feeRouter), address(riskManager),
+            address(gateway), terms.creator, terms.manifestHash, terms.resolver, b, terms.closeTime,
+            terms.resolutionAvailableTime, terms.terminalDeadline, fundingDeadline, _lmsrMarketSalt(terms), _vaultSalt(terms)
         );
-        market = address(instance);
-        LMSRLiquidityVault vaultInstance = new LMSRLiquidityVault(
-            usdc, market, address(riskManager), instance.fundingTarget(), fundingDeadline
-        );
-        vault = address(vaultInstance);
-        instance.bindVault(vault);
         markets[terms.marketId] = market;
         outcomeTokens.registerMarket(market, terms.marketId);
         _register(terms, market);
@@ -146,6 +139,12 @@ contract MarketFactory is AccessControl {
 
     function _salt(MarketTerms calldata terms) internal pure returns (bytes32) {
         return keccak256(abi.encode("GENETIA_MARKET", terms.marketId, terms.financialReleaseId, terms.manifestHash));
+    }
+    function _lmsrMarketSalt(MarketTerms calldata terms) internal pure returns (bytes32) { return _salt(terms); }
+    function _vaultSalt(MarketTerms calldata terms) internal pure returns (bytes32) { return keccak256(abi.encode("GENETIA_VAULT", terms.marketId, terms.financialReleaseId, terms.manifestHash)); }
+    function _fundingTarget(uint256 b) internal pure returns (uint256) {
+        uint256 target = (b * 693147180559945309 * 110 + (100 * 1e18 - 1)) / (100 * 1e18);
+        return target < 100e6 ? 100e6 : target;
     }
 
     function _register(MarketTerms calldata terms, address market) internal {

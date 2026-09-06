@@ -31,11 +31,12 @@ contract ResolutionGateway is AccessControl, EIP712 {
         bytes32 resolverReleaseId;
         uint8 attempt;
         uint8 outcome;
+        bytes32 evidenceCommitment;
         bytes32 resultCommitment;
     }
 
     bytes32 public constant ENVELOPE_TYPEHASH = keccak256(
-        "ResolutionEnvelope(bytes32 marketId,address baseMarket,uint256 baseChainId,address resolver,uint256 genlayerChainId,bytes32 genlayerTxId,bytes32 manifestHash,bytes32 resolverReleaseId,uint8 attempt,uint8 outcome,bytes32 resultCommitment)"
+        "ResolutionEnvelope(bytes32 marketId,address baseMarket,uint256 baseChainId,address resolver,uint256 genlayerChainId,bytes32 genlayerTxId,bytes32 manifestHash,bytes32 resolverReleaseId,uint8 attempt,uint8 outcome,bytes32 evidenceCommitment,bytes32 resultCommitment)"
     );
 
     address[5] public watchers;
@@ -94,6 +95,7 @@ contract ResolutionGateway is AccessControl, EIP712 {
                     envelope.resolverReleaseId,
                     envelope.attempt,
                     envelope.outcome,
+                    envelope.evidenceCommitment,
                     envelope.resultCommitment
                 )
             )

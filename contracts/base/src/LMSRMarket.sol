@@ -41,12 +41,14 @@ contract LMSRMarket is ReentrancyGuard {
     uint256 public qYes;
     uint256 public qNo;
     uint256 public totalFees;
+    bool public voidDustReleased;
 
     event Activated(uint256 funding);
     event Bought(address indexed trader, uint8 indexed side, uint256 shares, uint256 notional, uint256 fee);
     event Sold(address indexed trader, uint8 indexed side, uint256 shares, uint256 notional, uint256 fee);
     event Settled(Outcome indexed outcome, uint256 liability, uint256 lpNav);
     event Redeemed(address indexed holder, uint256 yesBurned, uint256 noBurned, uint256 payout);
+    event VoidDustReleased(uint256 amount);
 
     constructor(
         bytes32 marketId_, bytes32 releaseId_, address token, address outcomeTokens_, address feeRouter_,
@@ -157,6 +159,20 @@ contract LMSRMarket is ReentrancyGuard {
         if (payout > 0) { riskManager.releaseExposure(address(this), payout); usdc.safeTransfer(msg.sender, payout); }
         require(terminalLiability(outcome) <= protectedCollateral(), "solvency");
         emit Redeemed(msg.sender, yesAmount, noAmount, payout);
+    }
+
+    /// @notice Sends the deterministic ceil/floor remainder to terminal LPs once no
+    /// outcome tokens remain. This is the only permitted destination for VOID dust.
+    function releaseVoidDust() external nonReentrant returns (uint256 dust) {
+        require(status == Status.TERMINAL && outcome == Outcome.VOID && !voidDustReleased, "void dust");
+        require(qYes == 0 && qNo == 0, "tokens remain");
+        voidDustReleased = true;
+        dust = usdc.balanceOf(address(this));
+        if (dust > 0) {
+            riskManager.releaseExposure(address(this), dust);
+            usdc.safeTransfer(address(vault), dust);
+        }
+        emit VoidDustReleased(dust);
     }
 
     function protectedCollateral() public view returns (uint256) { return usdc.balanceOf(address(this)); }

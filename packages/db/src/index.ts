@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 export * from "./indexer";
+export * from "./repositories";
 
 /** Indexed data is reconstructible; this client is never a custody ledger. */
 export function createDatabaseClient(databaseUrl: string): PrismaClient {

@@ -31,6 +31,9 @@ importers:
       '@genetia/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@neondatabase/serverless':
+        specifier: 1.1.0
+        version: 1.1.0
       hono:
         specifier: 4.13.5
         version: 4.13.5
@@ -44,6 +47,9 @@ importers:
       typescript:
         specifier: 5.6.3
         version: 5.6.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.7.5)(supports-color@10.2.2)
       wrangler:
         specifier: 4.129.0
         version: 4.129.0(@cloudflare/workers-types@4.20240925.0)(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -1337,6 +1343,10 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@neondatabase/serverless@1.1.0':
+    resolution: {integrity: sha512-r3ZZhRjEcfEdKIZnoB1RusNgvHuaBRqfCzV4Gi+5A9yUX0S4HTws/ASWqt13wL4y4I+0rqsWGdA2w7EQXHi3+Q==}
+    engines: {node: '>=19.0.0'}
 
   '@next/env@14.2.35':
     resolution: {integrity: sha512-DuhvCtj4t9Gwrx80dmz2F4t/zKQ4ktN8WrMwOuVzkJfBilwAwGr6v16M5eI8yCuZ63H9TTuEU09Iu2HqkzFPVQ==}
@@ -6710,6 +6720,8 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@neondatabase/serverless@1.1.0': {}
 
   '@next/env@14.2.35': {}
 

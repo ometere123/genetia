@@ -13,14 +13,15 @@ export interface MarketReadModel {
 type HyperdriveLike = { connectionString: string };
 
 function marketRow(row: Record<string, unknown>): unknown {
+  const field = (camel: string, snake: string) => row[camel] ?? row[snake];
   return MarketSchema.parse({
-    id: row.id, marketId: row.market_id, engine: row.engine, title: row.title,
-    question: row.question, description: row.description, category: row.category, status: row.status,
-    creatorAddress: row.creator_address, baseAddress: row.base_address,
-    financialReleaseId: row.financial_release_id, resolverAddress: row.resolver_address,
-    resolverReleaseId: row.resolver_release_id, manifestHash: row.manifest_hash,
-    closeTime: row.close_time, resolutionAvailableTime: row.resolution_available_time,
-    terminalDeadline: row.terminal_deadline, terminalOutcome: row.terminal_outcome ?? null,
+    id: field("id", "id"), marketId: field("marketId", "market_id"), engine: field("engine", "engine"), title: field("title", "title"),
+    question: field("question", "question"), description: field("description", "description"), category: field("category", "category"), status: field("status", "status"),
+    creatorAddress: field("creatorAddress", "creator_address"), baseAddress: field("baseAddress", "base_address"),
+    financialReleaseId: field("financialReleaseId", "financial_release_id"), resolverAddress: field("resolverAddress", "resolver_address"),
+    resolverReleaseId: field("resolverReleaseId", "resolver_release_id"), manifestHash: field("manifestHash", "manifest_hash"),
+    closeTime: field("closeTime", "close_time"), resolutionAvailableTime: field("resolutionAvailableTime", "resolution_available_time"),
+    terminalDeadline: field("terminalDeadline", "terminal_deadline"), terminalOutcome: field("terminalOutcome", "terminal_outcome") ?? null,
   });
 }
 
@@ -29,7 +30,7 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
   return {
     async listMarkets(category) {
       const rows = category
-        ? await sql`SELECT * FROM "Market" WHERE category = ${category} ORDER BY "createdAt" DESC LIMIT 200`
+        ? await sql`SELECT * FROM "Market" WHERE "category" = ${category} ORDER BY "createdAt" DESC LIMIT 200`
         : await sql`SELECT * FROM "Market" ORDER BY "createdAt" DESC LIMIT 200`;
       return rows.map((row) => marketRow(row as Record<string, unknown>));
     },

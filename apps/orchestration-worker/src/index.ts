@@ -4,13 +4,32 @@ import { GenetiaLifecycleWorkflow } from "./lifecycle-workflow";
 
 export { GenetiaLifecycleWorkflow };
 
-export interface Env { GENETIA_DB: Hyperdrive; GENETIA_JOBS: Queue; GENETIA_WORKFLOWS: Workflow; GENLAYER_RPC:string; }
+export interface Env { GENETIA_DB: Hyperdrive; GENETIA_JOBS: Queue; GENETIA_DLQ: Queue; GENETIA_WORKFLOWS: Workflow; GENLAYER_RPC:string; RECONCILE_SECRET?: string; }
+
+async function sameSecret(provided: string, expected: string): Promise<boolean> {
+  const [left, right] = await Promise.all([crypto.subtle.digest("SHA-256", new TextEncoder().encode(provided)), crypto.subtle.digest("SHA-256", new TextEncoder().encode(expected))]);
+  const a = new Uint8Array(left); const b = new Uint8Array(right);
+  if (a.length !== b.length) return false;
+  let difference = 0; for (let i = 0; i < a.length; i++) difference |= a[i]! ^ b[i]!;
+  return difference === 0;
+}
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const idempotencyKey = reconciliationKey(Date.now());
     ctx.waitUntil(env.GENETIA_JOBS.send({ kind: "reconcile-due-markets", idempotencyKey }));
   },
-  async fetch(request: Request) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+    if (url.pathname === "/reconcile") {
+      if (request.method !== "POST" || !env.RECONCILE_SECRET) return new Response("Not found", { status: 404 });
+      const supplied = request.headers.get("x-genetia-reconcile-secret");
+      const tick = request.headers.get("x-genetia-reconcile-id");
+      if (!supplied || !tick || !(await sameSecret(supplied, env.RECONCILE_SECRET))) return new Response("Unauthorized", { status: 401 });
+      const idempotencyKey = reconciliationKey(Date.now());
+      ctx.waitUntil(env.GENETIA_JOBS.send({ kind: "reconcile-due-markets", idempotencyKey }));
+      return Response.json({ ok: true, accepted: true, idempotencyKey });
+    }
     return new Response(JSON.stringify({ ok: true, service: "orchestration", method: request.method }), {
       headers: { "content-type": "application/json" },
     });
@@ -24,7 +43,10 @@ export default {
         // completed; failures are retried or dead-lettered by the queue.
         message.ack();
       } catch (error) {
-        if (classifyQueueError(error) === "dead-letter") message.ack();
+        if (classifyQueueError(error) === "dead-letter") {
+          await env.GENETIA_DLQ.send({ original: message.body, error: error instanceof Error ? error.message : "terminal queue error" });
+          message.ack();
+        }
         else message.retry({ delaySeconds: 60 });
       }
     }

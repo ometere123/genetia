@@ -35,7 +35,7 @@ export class GenetiaRepositories {
     if (!events.length) return [];
     await this.db.$transaction(async (tx) => {
       await tx.chainEvent.createMany({
-        data: events.map((event) => ({ chainId: event.chainId, transactionHash: event.transactionHash, logIndex: event.logIndex, blockNumber: event.blockNumber, blockHash: event.blockHash, contractAddress: event.contractAddress, eventName: event.eventName, payload: event.payload as Prisma.InputJsonValue })),
+        data: events.map((event) => ({ chainId: event.chainId, transactionHash: event.transactionHash, logIndex: event.logIndex, blockNumber: event.blockNumber, blockHash: event.blockHash, transactionIndex: event.transactionIndex, contractAddress: event.contractAddress, eventName: event.eventName, payload: event.payload as Prisma.InputJsonValue })),
         skipDuplicates: true,
       });
       const last = events.reduce((max, event) => event.blockNumber > max ? event.blockNumber : max, 0n);
@@ -46,4 +46,8 @@ export class GenetiaRepositories {
   }
 
   async cursor(chainId: number) { return this.db.indexerCursor.findUnique({ where: { chainId } }); }
+
+  async advanceCursor(cursor: { chainId: number; deploymentBlock: bigint; nextBlock: bigint; lastBlockHash: string }) {
+    return this.db.indexerCursor.upsert({ where: { chainId: cursor.chainId }, create: cursor, update: { nextBlock: cursor.nextBlock, lastBlockHash: cursor.lastBlockHash } });
+  }
 }

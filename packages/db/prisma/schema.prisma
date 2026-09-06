@@ -182,6 +182,7 @@ model ChainEvent {
   logIndex        Int
   blockNumber     BigInt
   blockHash       String
+  transactionIndex Int?
   contractAddress String
   eventName       String
   payload         Json

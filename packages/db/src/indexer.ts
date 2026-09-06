@@ -4,6 +4,7 @@ export type ChainEventInput = {
   logIndex: number;
   blockNumber: bigint;
   blockHash: `0x${string}`;
+  transactionIndex?: number;
   contractAddress: `0x${string}`;
   eventName: string;
   payload: Record<string, unknown>;
@@ -22,7 +23,7 @@ export function indexEvents(existing: readonly IndexedChainEvent[], incoming: re
     const identity = chainEventIdentity(event);
     if (!byIdentity.has(identity)) byIdentity.set(identity, { ...event, identity });
   }
-  return [...byIdentity.values()].sort((a, b) => a.blockNumber < b.blockNumber ? -1 : a.blockNumber > b.blockNumber ? 1 : a.logIndex - b.logIndex);
+  return [...byIdentity.values()].sort((a, b) => a.blockNumber < b.blockNumber ? -1 : a.blockNumber > b.blockNumber ? 1 : (a.transactionIndex ?? 0) - (b.transactionIndex ?? 0) || a.logIndex - b.logIndex);
 }
 
 export function rebuildFromDeploymentBlock(events: readonly ChainEventInput[], deploymentBlock: bigint): IndexedChainEvent[] {

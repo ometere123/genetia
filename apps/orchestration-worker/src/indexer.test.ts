@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { chainEventIdentity, findReorgRollbackPoint, indexEvents, rebuildFromDeploymentBlock, rollbackToBlock, type ChainEventInput } from "../../../packages/db/src/indexer.js";
 import { GenetiaRepositories } from "../../../packages/db/src/repositories.js";
 import { decodeBaseLog } from "../../../packages/db/src/base-events.js";
+import { emptyProjection, projectEvents, serialiseProjection } from "../../../packages/db/src/projections.js";
+import { BaseIndexer } from "../../../packages/db/src/base-indexer.js";
 import { encodeAbiParameters, keccak256, parseAbiParameters, toHex, toBytes } from "viem";
 
 const event = (tx: `0x${string}`, logIndex: number, blockNumber: bigint, payload: Record<string, unknown> = {}): ChainEventInput => ({
@@ -68,8 +70,56 @@ describe("replayable Base event identity", () => {
     const first = event(`0x${"06".repeat(32)}`, 0, 20n);
     const second = { ...event(`0x${"07".repeat(32)}`, 0, 21n), blockHash: `0x${"ef".repeat(32)}` as `0x${string}` };
     const indexed = indexEvents([], [first, second]);
-    const rollback = findReorgRollbackPoint(indexed, { deploymentBlock: 20n, nextBlock: 22n, lastBlockHash: second.blockHash }, new Map([[20n, first.blockHash], [21n, `0x${"aa".repeat(32)}`]]));
+    const rollback = findReorgRollbackPoint(indexed, { deploymentBlock: 20n, nextBlock: 22n, lastBlockHash: second.blockHash }, new Map<bigint, `0x${string}`>([[20n, first.blockHash], [21n, `0x${"aa".repeat(32)}`]]));
     expect(rollback).toBe(20n);
     expect(rollbackToBlock(indexed, rollback!)).toEqual([indexed[0]]);
+  });
+
+  it("rebuilds the complete derived projection from the event stream", () => {
+    const pool = `0x${"aa".repeat(20)}` as `0x${string}`;
+    const factory = `0x${"bb".repeat(20)}` as `0x${string}`;
+    const marketId = "0x" + "11".repeat(32);
+    const alice = `0x${"cc".repeat(20)}`;
+    const events = [
+      { ...event(`0x${"10".repeat(32)}`, 0, 1n, { releaseId: "pool-a", implementation: "0x1" }), eventName: "ReleaseRegistered", contractAddress: factory },
+      { ...event(`0x${"11".repeat(32)}`, 0, 2n, { marketId, market: pool, releaseId: "pool-a" }), eventName: "PoolCreated", contractAddress: factory },
+      { ...event(`0x${"12".repeat(32)}`, 0, 3n, { account: alice, yes: true, amount: "7" }), eventName: "Staked", contractAddress: pool },
+      { ...event(`0x${"13".repeat(32)}`, 0, 4n, { outcome: 0, fee: "1" }), eventName: "Settled", contractAddress: pool },
+      { ...event(`0x${"14".repeat(32)}`, 0, 5n, { account: alice, amount: "8" }), eventName: "Claimed", contractAddress: pool },
+    ];
+    const expected = serialiseProjection(projectEvents(indexEvents([], events)));
+    const destroyed = emptyProjection();
+    expect(serialiseProjection(projectEvents(indexEvents([], events)))).toBe(expected);
+    expect(serialiseProjection(destroyed)).not.toBe(expected);
+    expect(JSON.parse(expected).markets[marketId].positions[alice].yes).toBe("7");
+  });
+
+  it("replays a replacement canonical block after rollback", () => {
+    const pool = `0x${"dd".repeat(20)}` as `0x${string}`;
+    const marketId = "0x" + "22".repeat(32);
+    const created = { ...event(`0x${"20".repeat(32)}`, 0, 10n, { marketId, market: pool, releaseId: "pool-a" }), eventName: "PoolCreated", contractAddress: `0x${"ee".repeat(20)}` as `0x${string}` };
+    const orphan = { ...event(`0x${"21".repeat(32)}`, 0, 11n, { account: `0x${"01".repeat(20)}`, yes: true, amount: "3" }), eventName: "Staked", contractAddress: pool, blockHash: `0x${"ef".repeat(32)}` as `0x${string}` };
+    const replacement = { ...orphan, transactionHash: `0x${"22".repeat(32)}` as `0x${string}`, blockHash: `0x${"f0".repeat(32)}` as `0x${string}`, payload: { account: `0x${"01".repeat(20)}`, yes: false, amount: "4" } };
+    const indexed = indexEvents([], [created, orphan]);
+    const rollback = findReorgRollbackPoint(indexed, { deploymentBlock: 10n, nextBlock: 12n, lastBlockHash: orphan.blockHash }, new Map<bigint, `0x${string}`>([[10n, created.blockHash], [11n, replacement.blockHash]]));
+    const rebuilt = projectEvents(indexEvents([], [...rollbackToBlock(indexed, rollback!), replacement]));
+    expect(rebuilt.markets[marketId].positions[`0x${"01".repeat(20)}`]).toMatchObject({ yes: 0n, no: 4n });
+  });
+
+  it("reads a bounded RPC batch, decodes logs, persists them, and advances the cursor", async () => {
+    const account = `0x${"11".repeat(20)}` as `0x${string}`;
+    const signature = keccak256(toBytes("Staked(address,bool,uint256)"));
+    const indexed = encodeAbiParameters(parseAbiParameters(["address", "bool"]), [account, true]);
+    const client = {
+      getBlockNumber: async () => 12n,
+      getBlock: async () => ({ hash: `0x${"55".repeat(32)}` as `0x${string}` }),
+      getLogs: async () => [{ address: `0x${"22".repeat(20)}` as `0x${string}`, topics: [signature, `0x${indexed.slice(2, 66)}`, `0x${indexed.slice(66)}`] as [`0x${string}`, ...`0x${string}`[]], data: encodeAbiParameters(parseAbiParameters(["uint256"]), [9n]), transactionHash: `0x${"33".repeat(32)}` as `0x${string}`, blockHash: `0x${"44".repeat(32)}` as `0x${string}`, blockNumber: 12n, transactionIndex: 2, logIndex: 0 }],
+    };
+    const persisted: ChainEventInput[] = []; let advanced: unknown;
+    const indexer = new BaseIndexer({ rpcUrl: "http://unused", deploymentBlock: 10n, batchSize: 3n, client, store: { cursor: async () => ({ deploymentBlock: 10n, nextBlock: 10n, lastBlockHash: null }), persistEvents: async (events) => persisted.push(...events), advanceCursor: async (value) => { advanced = value; } } });
+    await expect(indexer.runOnce()).resolves.toMatchObject({ fromBlock: 10n, toBlock: 12n, decoded: 1 });
+    expect(persisted[0]?.eventName).toBe("Staked");
+    expect(persisted[0]?.transactionIndex).toBe(2);
+    expect(advanced).toMatchObject({ nextBlock: 13n, lastBlockHash: `0x${"55".repeat(32)}` });
   });
 });

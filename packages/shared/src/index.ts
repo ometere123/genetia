@@ -36,6 +36,7 @@ export const ResolutionManifestSchema = ResolutionManifestBase.refine((manifest)
 
 export const MarketSchema = z.object({
   id: z.string(), marketId: z.string(), engine: EngineSchema, title: z.string(), question: z.string(), description: z.string(),
+  yesDefinition: z.string().optional(), noDefinition: z.string().optional(),
   category: z.string(), status: z.string(), creatorAddress: AddressSchema, baseAddress: AddressSchema,
   financialReleaseId: z.string(), resolverAddress: AddressSchema, resolverReleaseId: z.string(), manifestHash: HashSchema,
   closeTime: z.string().datetime(), resolutionAvailableTime: z.string().datetime(), terminalDeadline: z.string().datetime(),

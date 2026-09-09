@@ -1,7 +1,6 @@
--- Genetia has one scheduler: Supabase Cron. This wakes the Cloudflare
--- orchestration Worker; it never chooses a market outcome or writes funds.
--- Store both values in Supabase Vault as `genetia-reconcile-url` and
--- `genetia-reconcile-secret` before applying this definition.
+-- Canonical scheduler for Genetia. Apply only after storing these Vault secrets:
+-- genetia-reconcile-url and genetia-reconcile-secret.
+-- This job only wakes idempotent orchestration; it cannot choose outcomes.
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 

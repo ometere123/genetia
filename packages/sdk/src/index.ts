@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Market, ResolutionEnvelope, Proposal, QuoteRequest, Quote, TransactionPreparation, MarketSchema, ResolutionEnvelopeSchema, QuoteSchema, TransactionPreparationSchema } from "@genetia/shared";
+import { Market, ResolutionRecord, Proposal, QuoteRequest, Quote, TransactionPreparation, MarketSchema, ResolutionRecordSchema, QuoteSchema, TransactionPreparationSchema } from "@genetia/shared";
 export type GenetiaClientOptions = { baseUrl: string; fetch?: typeof fetch; headers?: Record<string, string> };
 export type ActivityRecord = Record<string, unknown>;
 export type MarketPage = { items: Market[]; nextCursor: string | null };
@@ -28,7 +28,7 @@ export class GenetiaClient {
   async prices(id:string):Promise<ActivityRecord>{ return this.get(`/markets/${encodeURIComponent(id)}/prices`, { parse: (v) => z.record(z.unknown()).parse(v) }); }
   async trades(id:string):Promise<ActivityRecord[]>{ return this.get(`/markets/${encodeURIComponent(id)}/trades`, RecordsSchema); }
   async liquidity(id:string):Promise<ActivityRecord[]>{ return this.get(`/markets/${encodeURIComponent(id)}/liquidity`, RecordsSchema); }
-  async resolution(id:string):Promise<ResolutionEnvelope>{return this.get(`/markets/${encodeURIComponent(id)}/resolution`, ResolutionEnvelopeSchema);}
+  async resolution(id:string):Promise<ResolutionRecord>{return this.get(`/markets/${encodeURIComponent(id)}/resolution`, ResolutionRecordSchema);}
   async evidence(id:string):Promise<ActivityRecord[]>{ return this.get(`/markets/${encodeURIComponent(id)}/evidence`, RecordsSchema); }
   async positions(address:string):Promise<ActivityRecord[]>{ return this.get(`/users/${address}/positions`, RecordsSchema); }
   async history(address:string):Promise<ActivityRecord[]>{ return this.get(`/users/${address}/history`, RecordsSchema); }

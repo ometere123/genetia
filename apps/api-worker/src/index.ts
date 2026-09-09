@@ -12,7 +12,12 @@ const auth = (value: string | undefined) => Boolean(value?.startsWith("Bearer ")
 app.get("/health", (c) => c.json({ ok: true, baseChainId: CHAIN.base, genlayerChainId: CHAIN.genlayer, database: Boolean(c.env.DB) }));
 app.get("/markets", async (c) => {
   if (!c.env.DB) return c.json({ error: "indexed market source is not configured" }, 503);
-  return c.json(await createMarketReadModel(c.env.DB).listMarkets(c.req.query("category")));
+  const limit = Number(c.req.query("limit") ?? "25");
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) return c.json({ error: "limit must be an integer from 1 to 100" }, 400);
+  const engine = c.req.query("engine"); if (engine && !["POOL", "LMSR"].includes(engine)) return c.json({ error: "invalid engine" }, 400);
+  const status = c.req.query("status");
+  try { return c.json(await createMarketReadModel(c.env.DB).listMarkets({ category: c.req.query("category"), engine, status, cursor: c.req.query("cursor"), limit })); }
+  catch (error) { return c.json({ error: error instanceof Error ? error.message : "invalid request" }, 400); }
 });
 app.get("/markets/:id", async (c) => {
   const marketId = id.parse(c.req.param("id"));
@@ -23,7 +28,7 @@ app.get("/markets/:id", async (c) => {
 for (const suffix of ["prices", "trades", "liquidity", "resolution", "evidence"] as const) app.get(`/markets/:id/${suffix}`, async (c) => {
   const marketId = id.parse(c.req.param("id"));
   if (!c.env.DB) return c.json({ error: "indexed market source is not configured" }, 503);
-  if (suffix === "prices") return c.json({ marketId, source: "Base", prices: null });
+  if (suffix === "prices") { const prices = await createMarketReadModel(c.env.DB).getPrices(marketId); return prices ? c.json(prices) : c.json({ error: "market not found" }, 404); }
   const collection = suffix === "trades" ? "trades" : suffix === "liquidity" ? "liquidity" : suffix === "resolution" ? "resolution" : "evidence";
   return c.json(await createMarketReadModel(c.env.DB).getMarketCollection(marketId, collection));
 });

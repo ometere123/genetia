@@ -2,37 +2,60 @@ import { neon } from "@neondatabase/serverless";
 import { MarketSchema } from "@genetia/shared";
 
 export interface MarketReadModel {
-  listMarkets(category?: string): Promise<unknown[]>;
+  listMarkets(options: { category?: string; engine?: string; status?: string; cursor?: string; limit?: number }): Promise<{ items: unknown[]; nextCursor: string | null }>;
   getMarket(marketId: string): Promise<unknown | null>;
   getMarketCollection(marketId: string, collection: "trades" | "liquidity" | "evidence" | "resolution"): Promise<unknown[]>;
   getPositions(address: string): Promise<unknown[]>;
   getHistory(address: string): Promise<unknown[]>;
   getProposal(proposalId: string): Promise<unknown | null>;
+  getPrices(marketId: string): Promise<unknown | null>;
 }
 
 type HyperdriveLike = { connectionString: string };
 
 function marketRow(row: Record<string, unknown>): unknown {
   const field = (camel: string, snake: string) => row[camel] ?? row[snake];
+  const date = (value: unknown) => value instanceof Date ? value.toISOString() : String(value);
+  const manifest = (field("manifestJson", "manifest_json") ?? {}) as Record<string, unknown>;
+  const engine = field("engine", "engine");
+  const poolYes = field("poolYesTotal", "pool_yes_total");
+  const poolNo = field("poolNoTotal", "pool_no_total");
   return MarketSchema.parse({
     id: field("id", "id"), marketId: field("marketId", "market_id"), engine: field("engine", "engine"), title: field("title", "title"),
     question: field("question", "question"), description: field("description", "description"), category: field("category", "category"), status: field("status", "status"),
     creatorAddress: field("creatorAddress", "creator_address"), baseAddress: field("baseAddress", "base_address"),
     financialReleaseId: field("financialReleaseId", "financial_release_id"), resolverAddress: field("resolverAddress", "resolver_address"),
     resolverReleaseId: field("resolverReleaseId", "resolver_release_id"), manifestHash: field("manifestHash", "manifest_hash"),
-    closeTime: field("closeTime", "close_time"), resolutionAvailableTime: field("resolutionAvailableTime", "resolution_available_time"),
-    terminalDeadline: field("terminalDeadline", "terminal_deadline"), terminalOutcome: field("terminalOutcome", "terminal_outcome") ?? null,
+    closeTime: date(field("closeTime", "close_time")), resolutionAvailableTime: date(field("resolutionAvailableTime", "resolution_available_time")),
+    terminalDeadline: date(field("terminalDeadline", "terminal_deadline")), terminalOutcome: field("terminalOutcome", "terminal_outcome") ?? null,
+    pool: engine === "POOL" ? { yesTotal: String(poolYes ?? "0"), noTotal: String(poolNo ?? "0") } : undefined,
+    yesDefinition: manifest.yes_definition, noDefinition: manifest.no_definition,
   });
 }
+
+function decodeCursor(value: string | undefined): { createdAt: string; id: string } | null {
+  if (!value) return null;
+  try { const parsed = JSON.parse(atob(value)) as { createdAt?: string; id?: string }; return parsed.createdAt && parsed.id ? { createdAt: parsed.createdAt, id: parsed.id } : null; }
+  catch { throw new Error("invalid cursor"); }
+}
+function encodeCursor(value: { createdAt: unknown; id: unknown }): string { return btoa(JSON.stringify({ createdAt: String(value.createdAt), id: String(value.id) })); }
 
 export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
   const sql = neon(db.connectionString);
   return {
-    async listMarkets(category) {
-      const rows = category
-        ? await sql`SELECT * FROM "Market" WHERE "category" = ${category} ORDER BY "createdAt" DESC LIMIT 200`
-        : await sql`SELECT * FROM "Market" ORDER BY "createdAt" DESC LIMIT 200`;
-      return rows.map((row) => marketRow(row as Record<string, unknown>));
+    async listMarkets(options) {
+      const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);
+      const cursor = decodeCursor(options.cursor);
+      const rows = await sql`
+        SELECT * FROM "Market"
+        WHERE (${options.category ?? null}::text IS NULL OR "category" = ${options.category ?? null})
+          AND (${options.engine ?? null}::text IS NULL OR "engine"::text = ${options.engine ?? null})
+          AND (${options.status ?? null}::text IS NULL OR "status"::text = ${options.status ?? null})
+          AND (${cursor?.createdAt ?? null}::timestamptz IS NULL OR ("createdAt", "id") < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.id ?? null}))
+        ORDER BY "createdAt" DESC, "id" DESC LIMIT ${limit + 1}`;
+      const page = rows.slice(0, limit);
+      const last = page.at(-1) as Record<string, unknown> | undefined;
+      return { items: page.map((row) => marketRow(row as Record<string, unknown>)), nextCursor: rows.length > limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null };
     },
     async getMarket(marketId) {
       const rows = await sql`SELECT * FROM "Market" WHERE "marketId" = ${marketId} LIMIT 1`;
@@ -53,6 +76,15 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
     async getProposal(proposalId) {
       const rows = await sql`SELECT * FROM "Proposal" WHERE id = ${proposalId} OR "proposalKey" = ${proposalId} LIMIT 1`;
       return rows[0] ?? null;
+    },
+    async getPrices(marketId) {
+      const rows = await sql`SELECT "engine", "poolYesTotal", "poolNoTotal", "lmsrB", "lmsrFundingTarget", "status" FROM "Market" WHERE "marketId" = ${marketId} LIMIT 1`;
+      if (!rows[0]) return null;
+      const row = rows[0] as Record<string, unknown>;
+      if (row.engine === "POOL") return { marketId, engine: "POOL", yesTotal: String(row.poolYesTotal ?? "0"), noTotal: String(row.poolNoTotal ?? "0") };
+      const projections = await sql`SELECT payload FROM "DerivedProjection" WHERE "projectionKey" = ${`market:${marketId}`} LIMIT 1`;
+      const payload = (projections[0]?.payload ?? {}) as Record<string, unknown>;
+      return { marketId, engine: "LMSR", b: String(row.lmsrB ?? "0"), fundingTarget: String(row.lmsrFundingTarget ?? "0"), qYes: String(payload.qYes ?? "0"), qNo: String(payload.qNo ?? "0"), status: row.status };
     },
   };
 }

@@ -4,7 +4,7 @@ import { MarketSchema } from "@genetia/shared";
 export interface MarketReadModel {
   listMarkets(options: { category?: string; engine?: string; status?: string; cursor?: string; limit?: number }): Promise<{ items: unknown[]; nextCursor: string | null }>;
   getMarket(marketId: string): Promise<unknown | null>;
-  getMarketCollection(marketId: string, collection: "trades" | "liquidity" | "evidence" | "resolution"): Promise<unknown[]>;
+  getMarketCollection(marketId: string, collection: "trades" | "liquidity" | "evidence" | "resolution"): Promise<unknown[] | null>;
   getPositions(address: string): Promise<unknown[]>;
   getHistory(address: string): Promise<unknown[]>;
   getProposal(proposalId: string): Promise<unknown | null>;
@@ -62,6 +62,8 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
       return rows[0] ? marketRow(rows[0] as Record<string, unknown>) : null;
     },
     async getMarketCollection(marketId, collection) {
+      const marketRows = await sql`SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId} LIMIT 1`;
+      if (!marketRows[0]) return null;
       if (collection === "trades") return sql`SELECT * FROM "genetia_app"."Trade" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "createdAt" DESC LIMIT 200`;
       if (collection === "liquidity") return sql`SELECT * FROM "genetia_app"."LiquidityActivity" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "createdAt" DESC LIMIT 200`;
       if (collection === "evidence") return sql`SELECT * FROM "genetia_app"."Evidence" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "fetchedAt" DESC LIMIT 200`;

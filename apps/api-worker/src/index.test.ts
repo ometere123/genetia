@@ -63,6 +63,14 @@ describe("canonical API contract", () => {
     }
   });
 
+  it("distinguishes an empty collection from a missing market", async () => {
+    const missingModel: MarketReadModel = { ...model, getMarketCollection: async (id) => id === "m1" ? [] : null };
+    const missingApp = createApiApp(() => missingModel);
+    expect((await missingApp.request("http://localhost/api/markets/missing/trades", {}, boundEnv)).status).toBe(404);
+    expect((await missingApp.request("http://localhost/api/markets/m1/trades", {}, boundEnv)).status).toBe(200);
+    await expect((await missingApp.request("http://localhost/api/markets/m1/trades", {}, boundEnv)).json()).resolves.toEqual([]);
+  });
+
   it("serves proposal, positions, history, and health reads", async () => {
     await expect((await boundApp.request("http://localhost/api/market-proposals/p1", {}, boundEnv)).json()).resolves.toMatchObject({ id: "p1" });
     await expect((await boundApp.request(`http://localhost/api/users/${market.creatorAddress}/positions`, {}, boundEnv)).json()).resolves.toEqual([{ marketId: "m1" }]);

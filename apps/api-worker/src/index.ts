@@ -34,7 +34,8 @@ for (const suffix of ["prices", "trades", "liquidity", "resolution", "evidence"]
   if (!c.env.DB) return c.json({ error: "indexed market source is not configured" }, 503);
   if (suffix === "prices") { const prices = await factory(c.env.DB).getPrices(marketId); return prices ? c.json(prices) : c.json({ error: "market not found" }, 404); }
   const collection = suffix === "trades" ? "trades" : suffix === "liquidity" ? "liquidity" : suffix === "resolution" ? "resolution" : "evidence";
-  return c.json(await factory(c.env.DB).getMarketCollection(marketId, collection));
+  const records = await factory(c.env.DB).getMarketCollection(marketId, collection);
+  return records ? c.json(records) : c.json({ error: "market not found" }, 404);
 });
 app.post("/markets/:id/quote", async (c) => {
   id.parse(c.req.param("id"));

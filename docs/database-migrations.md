@@ -16,6 +16,37 @@ The schemas are intentionally isolated:
 - The Cloudflare API accesses application data through repositories/Hyperdrive;
   the Supabase Data API is not the application boundary.
 
+Connection roles are deliberately separate:
+
+- `DIRECT_URL` is the Prisma migration/CLI connection. In the current Windows
+  environment it uses Supavisor session mode on port 5432 and is scoped to
+  `genetia_app` for Prisma migration commands.
+- `DATABASE_URL` is for local Node development/testing only unless a specific
+  non-Worker runtime explicitly consumes it. It is not a fallback for deployed
+  Workers.
+- Production Workers receive the `GENETIA_DB` Hyperdrive binding and use its
+  `connectionString`. Hyperdrive's origin must be the Supabase Direct
+  PostgreSQL connection, not either Supavisor pooler mode. The API uses the
+  Hyperdrive-compatible `pg` driver (minimum pinned version 8.16.3).
+
+The API Worker currently has no Hyperdrive resource ID configured, so its
+dry-run exposes no database binding and it cannot be deployed as a connected
+production API yet. Once an account-owned Hyperdrive configuration exists, add
+only its ID to the `GENETIA_DB` binding in the Worker configuration; do not add
+an environment-URL fallback.
+
+The pending account operation is equivalent to:
+
+`pnpm --filter @genetia/api-worker exec wrangler hyperdrive create genetia-db
+--connection-string="<Supabase Direct PostgreSQL connection>"`
+
+The connection string must be supplied securely and must use Supabase Direct
+PostgreSQL. It is not committed or placed in Wrangler configuration. Hyperdrive
+is included in Cloudflare Workers Free and Paid plans; the Free plan has a
+documented daily query allowance, while Paid has unlimited query volume. The
+resource is not created until the account-owned origin credential and binding
+ID are ready.
+
 The root `supabase/migrations/` directory contains only platform scheduling
 configuration. `20260910000000_genetia_reconciliation_cron.sql` installs
 `pg_cron`/`pg_net` and schedules the authenticated reconciliation wake-up. It

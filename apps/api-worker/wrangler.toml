@@ -7,3 +7,8 @@ BASE_CHAIN_ID = "84532"
 GENLAYER_CHAIN_ID = "61997"
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 
+# Bind the account-owned Hyperdrive config here once provisioned. The origin
+# must be Supabase Direct PostgreSQL; do not substitute a Supavisor pooler.
+# [[hyperdrive]]
+# binding = "GENETIA_DB"
+# id = "<account-owned-hyperdrive-id>"

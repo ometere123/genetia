@@ -14,7 +14,7 @@ const model: MarketReadModel = {
   getPrices: async (id) => id === "m1" ? { marketId: id, engine: "POOL", yesTotal: "4", noTotal: "2" } : null,
 };
 const boundApp = createApiApp(() => model);
-const boundEnv = { ...env, DB: {} as Hyperdrive };
+const boundEnv = { ...env, GENETIA_DB: {} as Hyperdrive };
 
 describe("canonical API contract", () => {
   it("reports the locked chains and database health", async () => {

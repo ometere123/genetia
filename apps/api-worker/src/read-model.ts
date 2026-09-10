@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { Pool, type QueryResultRow } from "pg";
 import { MarketSchema } from "@genetia/shared";
 
 export interface MarketReadModel {
@@ -12,6 +12,19 @@ export interface MarketReadModel {
 }
 
 type HyperdriveLike = { connectionString: string };
+type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<QueryResultRow[]>;
+const pools = new Map<string, Pool>();
+
+function hyperdriveSql(connectionString: string): Sql {
+  let pool = pools.get(connectionString);
+  if (!pool) { pool = new Pool({ connectionString, max: 1 }); pools.set(connectionString, pool); }
+  return async (strings, ...values) => {
+    let text = strings[0] ?? "";
+    for (let i = 0; i < values.length; i++) text += `$${i + 1}${strings[i + 1] ?? ""}`;
+    const result = await pool!.query(text, values);
+    return result.rows;
+  };
+}
 
 function marketRow(row: Record<string, unknown>): unknown {
   const field = (camel: string, snake: string) => row[camel] ?? row[snake];
@@ -41,7 +54,7 @@ function decodeCursor(value: string | undefined): { createdAt: string; id: strin
 function encodeCursor(value: { createdAt: unknown; id: unknown }): string { return btoa(JSON.stringify({ createdAt: String(value.createdAt), id: String(value.id) })); }
 
 export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
-  const sql = neon(db.connectionString);
+  const sql = hyperdriveSql(db.connectionString);
   return {
     async listMarkets(options) {
       const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);

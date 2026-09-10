@@ -1,15 +1,18 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas   = ["genetia_app"]
 }
 
 enum MarketEngine {
   POOL
   LMSR
+  @@schema("genetia_app")
 }
 
 enum MarketStatus {
@@ -24,18 +27,22 @@ enum MarketStatus {
   TERMINAL
   EXPIRED
   FUNDING_FAILED
+  @@schema("genetia_app")
 }
 
 enum ResolutionReason {
   EVIDENCE
   TECHNICAL
+  @@schema("genetia_app")
 }
 
 enum TerminalOutcome {
   YES
   NO
   VOID
+  @@schema("genetia_app")
 }
+
 
 model User {
   id          String   @id @default(uuid()) @db.Uuid
@@ -48,6 +55,7 @@ model User {
   notifications Notification[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@schema("genetia_app")
 }
 
 model Wallet {
@@ -60,6 +68,7 @@ model Wallet {
   createdAt DateTime @default(now())
   @@unique([chainId, address])
   @@index([userId])
+  @@schema("genetia_app")
 }
 
 model Market {
@@ -106,6 +115,7 @@ model Market {
   updatedAt                 DateTime @updatedAt
   @@index([status, closeTime])
   @@index([category, createdAt])
+  @@schema("genetia_app")
 }
 
 model Proposal {
@@ -123,6 +133,7 @@ model Proposal {
   market          Market? @relation(fields: [marketId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  @@schema("genetia_app")
 }
 
 model ResolutionAttempt {
@@ -144,6 +155,7 @@ model ResolutionAttempt {
   market              Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
   @@unique([marketId, attemptNo, reason])
   @@index([lifecycle, retryDueAt])
+  @@schema("genetia_app")
 }
 
 model Evidence {
@@ -158,6 +170,7 @@ model Evidence {
   commitment      String
   market          Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
   @@unique([marketId, attemptNo, sourceIdentity, url])
+  @@schema("genetia_app")
 }
 
 model WatcherAttestation {
@@ -173,6 +186,7 @@ model WatcherAttestation {
   market           Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
   @@unique([marketId, genlayerTxId, watcherAddress])
   @@index([genlayerTxId, resultCommitment])
+  @@schema("genetia_app")
 }
 
 model ChainEvent {
@@ -190,6 +204,7 @@ model ChainEvent {
   indexedAt       DateTime @default(now())
   @@unique([chainId, transactionHash, logIndex])
   @@index([chainId, blockNumber, logIndex])
+  @@schema("genetia_app")
 }
 
 model Trade {
@@ -207,6 +222,7 @@ model Trade {
   market          Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   @@index([marketId, walletAddress])
+  @@schema("genetia_app")
 }
 
 model LiquidityActivity {
@@ -222,6 +238,7 @@ model LiquidityActivity {
   market          Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   @@index([marketId, walletAddress])
+  @@schema("genetia_app")
 }
 
 model Notification {
@@ -234,6 +251,7 @@ model Notification {
   acknowledgedAt DateTime?
   user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
+  @@schema("genetia_app")
 }
 
 model ApiKey {
@@ -246,6 +264,7 @@ model ApiKey {
   revokedAt   DateTime?
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  @@schema("genetia_app")
 }
 
 model CostAccounting {
@@ -259,6 +278,7 @@ model CostAccounting {
   metadata       Json?
   @@index([walletAddress, occurredAt])
   @@index([category, occurredAt])
+  @@schema("genetia_app")
 }
 
 model IndexerCursor {
@@ -267,6 +287,7 @@ model IndexerCursor {
   nextBlock         BigInt
   lastBlockHash     String?
   updatedAt         DateTime @updatedAt
+  @@schema("genetia_app")
 }
 
 model WorkflowState {
@@ -282,6 +303,7 @@ model WorkflowState {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   @@index([state, nextRunAt])
+  @@schema("genetia_app")
 }
 
 /// Rebuildable query projection. It is never a source of truth for funds.
@@ -294,4 +316,5 @@ model DerivedProjection {
   updatedAt     DateTime @updatedAt
   @@index([kind, marketId])
   @@index([walletAddress, kind])
+  @@schema("genetia_app")
 }

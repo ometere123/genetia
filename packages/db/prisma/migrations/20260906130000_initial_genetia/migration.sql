@@ -1,3 +1,6 @@
+CREATE SCHEMA IF NOT EXISTS "genetia_app";
+SET search_path TO "genetia_app";
+
 -- CreateEnum
 CREATE TYPE "MarketEngine" AS ENUM ('POOL', 'LMSR');
 

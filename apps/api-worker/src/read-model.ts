@@ -47,7 +47,7 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
       const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);
       const cursor = decodeCursor(options.cursor);
       const rows = await sql`
-        SELECT * FROM "Market"
+        SELECT * FROM "genetia_app"."Market"
         WHERE (${options.category ?? null}::text IS NULL OR "category" = ${options.category ?? null})
           AND (${options.engine ?? null}::text IS NULL OR "engine"::text = ${options.engine ?? null})
           AND (${options.status ?? null}::text IS NULL OR "status"::text = ${options.status ?? null})
@@ -58,31 +58,31 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
       return { items: page.map((row) => marketRow(row as Record<string, unknown>)), nextCursor: rows.length > limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null };
     },
     async getMarket(marketId) {
-      const rows = await sql`SELECT * FROM "Market" WHERE "marketId" = ${marketId} LIMIT 1`;
+      const rows = await sql`SELECT * FROM "genetia_app"."Market" WHERE "marketId" = ${marketId} LIMIT 1`;
       return rows[0] ? marketRow(rows[0] as Record<string, unknown>) : null;
     },
     async getMarketCollection(marketId, collection) {
-      if (collection === "trades") return sql`SELECT * FROM "Trade" WHERE "marketId" IN (SELECT id FROM "Market" WHERE "marketId" = ${marketId}) ORDER BY "createdAt" DESC LIMIT 200`;
-      if (collection === "liquidity") return sql`SELECT * FROM "LiquidityActivity" WHERE "marketId" IN (SELECT id FROM "Market" WHERE "marketId" = ${marketId}) ORDER BY "createdAt" DESC LIMIT 200`;
-      if (collection === "evidence") return sql`SELECT * FROM "Evidence" WHERE "marketId" IN (SELECT id FROM "Market" WHERE "marketId" = ${marketId}) ORDER BY "fetchedAt" DESC LIMIT 200`;
-      return sql`SELECT * FROM "ResolutionAttempt" WHERE "marketId" IN (SELECT id FROM "Market" WHERE "marketId" = ${marketId}) ORDER BY "attemptNo" DESC LIMIT 200`;
+      if (collection === "trades") return sql`SELECT * FROM "genetia_app"."Trade" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "createdAt" DESC LIMIT 200`;
+      if (collection === "liquidity") return sql`SELECT * FROM "genetia_app"."LiquidityActivity" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "createdAt" DESC LIMIT 200`;
+      if (collection === "evidence") return sql`SELECT * FROM "genetia_app"."Evidence" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "fetchedAt" DESC LIMIT 200`;
+      return sql`SELECT * FROM "genetia_app"."ResolutionAttempt" WHERE "marketId" IN (SELECT id FROM "genetia_app"."Market" WHERE "marketId" = ${marketId}) ORDER BY "attemptNo" DESC LIMIT 200`;
     },
     async getPositions(address) {
-      return sql`SELECT * FROM "Trade" WHERE lower("walletAddress") = lower(${address}) ORDER BY "createdAt" DESC LIMIT 500`;
+      return sql`SELECT * FROM "genetia_app"."Trade" WHERE lower("walletAddress") = lower(${address}) ORDER BY "createdAt" DESC LIMIT 500`;
     },
     async getHistory(address) {
-      return sql`SELECT * FROM "Trade" WHERE lower("walletAddress") = lower(${address}) ORDER BY "createdAt" DESC LIMIT 500`;
+      return sql`SELECT * FROM "genetia_app"."Trade" WHERE lower("walletAddress") = lower(${address}) ORDER BY "createdAt" DESC LIMIT 500`;
     },
     async getProposal(proposalId) {
-      const rows = await sql`SELECT * FROM "Proposal" WHERE id = ${proposalId} OR "proposalKey" = ${proposalId} LIMIT 1`;
+      const rows = await sql`SELECT * FROM "genetia_app"."Proposal" WHERE id = ${proposalId} OR "proposalKey" = ${proposalId} LIMIT 1`;
       return rows[0] ?? null;
     },
     async getPrices(marketId) {
-      const rows = await sql`SELECT "engine", "poolYesTotal", "poolNoTotal", "lmsrB", "lmsrFundingTarget", "status" FROM "Market" WHERE "marketId" = ${marketId} LIMIT 1`;
+      const rows = await sql`SELECT "engine", "poolYesTotal", "poolNoTotal", "lmsrB", "lmsrFundingTarget", "status" FROM "genetia_app"."Market" WHERE "marketId" = ${marketId} LIMIT 1`;
       if (!rows[0]) return null;
       const row = rows[0] as Record<string, unknown>;
       if (row.engine === "POOL") return { marketId, engine: "POOL", yesTotal: String(row.poolYesTotal ?? "0"), noTotal: String(row.poolNoTotal ?? "0") };
-      const projections = await sql`SELECT payload FROM "DerivedProjection" WHERE "projectionKey" = ${`market:${marketId}`} LIMIT 1`;
+      const projections = await sql`SELECT payload FROM "genetia_app"."DerivedProjection" WHERE "projectionKey" = ${`market:${marketId}`} LIMIT 1`;
       const payload = (projections[0]?.payload ?? {}) as Record<string, unknown>;
       return { marketId, engine: "LMSR", b: String(row.lmsrB ?? "0"), fundingTarget: String(row.lmsrFundingTarget ?? "0"), qYes: String(payload.qYes ?? "0"), qNo: String(payload.qNo ?? "0"), status: row.status };
     },

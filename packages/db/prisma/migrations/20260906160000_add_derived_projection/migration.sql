@@ -1,3 +1,4 @@
+SET search_path TO "genetia_app";
 CREATE TABLE "DerivedProjection" (
     "projectionKey" TEXT NOT NULL,
     "kind" TEXT NOT NULL,

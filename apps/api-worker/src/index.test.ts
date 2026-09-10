@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { decodeFunctionData, parseAbi } from "viem";
 import app, { createApiApp } from "./index";
 import type { MarketReadModel } from "./read-model";
 
@@ -85,5 +86,21 @@ describe("canonical API contract", () => {
     expect(validQuote.status).toBe(501);
     const proposal = await boundApp.request("http://localhost/api/market-proposals", { method: "POST", headers: { authorization: "Bearer test" }, body: "{}" }, boundEnv);
     expect(proposal.status).toBe(400);
+  });
+
+  it("prepares and ABI-decodes a Pool stake for the user's wallet", async () => {
+    const response = await boundApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: "YES", action: "BUY", amount: "7" }) }, boundEnv);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: `0x${string}`; to: string; approval: unknown };
+    expect(body.to).toBe(market.baseAddress);
+    expect(decodeFunctionData({ abi: parseAbi(["function stake(bool yes, uint256 amount)"]), data: body.data })).toMatchObject({ functionName: "stake", args: [true, 7n] });
+    expect(body.approval).toBeNull();
+  });
+
+  it("rejects LMSR preparation without explicit slippage protection", async () => {
+    const lmsrModel = { ...model, getMarket: async (id: string) => id === "m1" ? { ...market, engine: "LMSR", lmsr: { b: "100000000", fundingTarget: "100000000", funded: "100000000", yesPrice: "500000000000000000", noPrice: "500000000000000000" } } : null } as MarketReadModel;
+    const lmsrApp = createApiApp(() => lmsrModel);
+    const response = await lmsrApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: "NO", action: "BUY", amount: "7" }) }, boundEnv);
+    expect(response.status).toBe(422);
   });
 });

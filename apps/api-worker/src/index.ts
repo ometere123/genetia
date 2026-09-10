@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { CHAIN, ProposalSchema, QuoteRequestSchema } from "@genetia/shared";
 import { createMarketReadModel, type MarketReadModel } from "./read-model";
+import { prepareTrade } from "./transaction-adapter";
 
 type Env = { GENETIA_DB?: Hyperdrive; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string };
 type ReadModelFactory = (db: Hyperdrive) => MarketReadModel;
@@ -42,7 +43,17 @@ app.post("/markets/:id/quote", async (c) => {
   const parsed = QuoteRequestSchema.safeParse(await c.req.json().catch(() => undefined));
   return parsed.success ? c.json({ error: "on-chain quote required", request: parsed.data }, 501) : c.json({ error: "invalid quote", issues: parsed.error.issues }, 400);
 });
-app.post("/markets/:id/prepare-trade", (c) => auth(c.req.header("authorization")) ? c.json({ error: "wallet authorization required" }, 501) : c.json({ error: "Privy authentication required" }, 401));
+app.post("/markets/:id/prepare-trade", async (c) => {
+  if (!auth(c.req.header("authorization"))) return c.json({ error: "Privy authentication required" }, 401);
+  if (!c.env.GENETIA_DB) return c.json({ error: "indexed market source is not configured" }, 503);
+  const marketId = id.parse(c.req.param("id"));
+  const market = await factory(c.env.GENETIA_DB).getMarket(marketId);
+  if (!market) return c.json({ error: "market not found" }, 404);
+  const parsed = QuoteRequestSchema.safeParse(await c.req.json().catch(() => undefined));
+  if (!parsed.success) return c.json({ error: "invalid trade", issues: parsed.error.issues }, 400);
+  try { return c.json(prepareTrade(market, parsed.data)); }
+  catch (error) { return c.json({ error: error instanceof Error ? error.message : "trade is not eligible" }, 422); }
+});
 app.post("/market-proposals", async (c) => {
   if (!auth(c.req.header("authorization"))) return c.json({ error: "Privy authentication required" }, 401);
   const parsed = ProposalSchema.safeParse(await c.req.json().catch(() => undefined));

@@ -48,12 +48,12 @@ The linked `genetia` project was inspected read-only with Supabase CLI
 2.116.0. Its remote migration history is empty, but its `public` schema is not
 empty: legacy tables including `arc_trades`, `circle_wallets`, `wallet_balances`,
 `wallet_transactions`, `bets`, `markets`, `positions`, and `settlements` exist.
-The expected Prisma tables are not present. The existing `public` schema/data
-is preserved legacy state. The authorized fresh deployment target is therefore
-`genetia_app`; no remote rows or migration history have been modified by this
-repository yet. The Cron migration remains blocked until its real authenticated
-Cloudflare reconciliation target exists; it must not schedule requests to a
-placeholder URL.
+The expected Prisma tables are deployed in `genetia_app`. The existing
+`public` schema/data remains preserved legacy state. The Prisma migration
+metadata is stored in `genetia_app._prisma_migrations`, and the three
+source-controlled application migrations are up to date. The Cron migration
+remains blocked until its real authenticated Cloudflare reconciliation target
+exists; it must not schedule requests to a placeholder URL.
 
 ## Local validation
 

@@ -1,6 +1,7 @@
 import { reconciliationKey } from "./runtime-state";
-import { classifyQueueError, validateQueueJob } from "./queue-jobs";
+import { classifyQueueError } from "./queue-jobs";
 import { GenetiaLifecycleWorkflow } from "./lifecycle-workflow";
+import { dispatchQueueJob } from "./queue-dispatch";
 
 export { GenetiaLifecycleWorkflow };
 
@@ -37,7 +38,7 @@ export default {
   async queue(batch: MessageBatch<unknown>, env: Env) {
     for (const message of batch.messages) {
       try {
-        validateQueueJob(message.body);
+        await dispatchQueueJob(message.body, env);
         // Durable workflow execution is attached at this boundary. A queue
         // acknowledgement is issued only after validation and dispatch have
         // completed; failures are retried or dead-lettered by the queue.

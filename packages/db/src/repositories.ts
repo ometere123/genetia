@@ -18,7 +18,34 @@ export class GenetiaRepositories {
   proposals = {
     create: (input: Prisma.ProposalCreateInput) => this.db.proposal.create({ data: input }),
     get: (proposalKey: string) => this.db.proposal.findUnique({ where: { proposalKey } }),
+    getByProposalId: (proposalId: string) => this.db.proposal.findUnique({ where: { proposalId } }),
     updateState: (proposalKey: string, data: Prisma.ProposalUpdateInput) => this.db.proposal.update({ where: { proposalKey }, data }),
+    /** Atomically records the durable proposal projection and its outbox intent. */
+    createWithWorkflowIntent: async (input: Prisma.ProposalCreateInput, workflow: Prisma.WorkflowStateCreateInput) => this.db.$transaction(async (tx) => {
+      const existing = await tx.proposal.findUnique({ where: { proposalKey: input.proposalKey } });
+      if (existing) {
+        if (existing.canonicalProposalHash !== input.canonicalProposalHash) throw new Error("idempotency key conflicts with proposal body");
+        return { proposal: existing, intent: await tx.workflowState.findUnique({ where: { idempotencyKey: workflow.idempotencyKey } }) };
+      }
+      const proposal = await tx.proposal.create({ data: input });
+      const intent = await tx.workflowState.create({ data: workflow });
+      return { proposal, intent };
+    }),
+  };
+
+  workflowIntents = {
+    load: (idempotencyKey: string) => this.db.workflowState.findUnique({ where: { idempotencyKey } }),
+    listDue: (now = new Date()) => this.db.workflowState.findMany({ where: { state: { in: ["PENDING", "RETRY"] }, OR: [{ nextRunAt: null }, { nextRunAt: { lte: now } }] }, orderBy: { createdAt: "asc" }, take: 100 }),
+    /** Atomic lease: concurrent dispatchers can never both claim a live intent. */
+    claim: async (idempotencyKey: string, now = new Date(), leaseMs = 60_000) => {
+      const result = await this.db.workflowState.updateMany({
+        where: { idempotencyKey, state: { in: ["PENDING", "RETRY"] }, OR: [{ nextRunAt: null }, { nextRunAt: { lte: now } }] },
+        data: { state: "CLAIMED", attempts: { increment: 1 }, nextRunAt: new Date(now.getTime() + leaseMs) },
+      });
+      return result.count === 1;
+    },
+    markDispatched: (idempotencyKey: string) => this.db.workflowState.update({ where: { idempotencyKey }, data: { state: "DISPATCHED", nextRunAt: null, lastError: null } }),
+    markRetry: (idempotencyKey: string, nextRunAt: Date, lastError: string) => this.db.workflowState.update({ where: { idempotencyKey }, data: { state: "RETRY", nextRunAt, lastError } }),
   };
 
   markets = {

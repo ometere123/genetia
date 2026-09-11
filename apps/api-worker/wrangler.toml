@@ -4,11 +4,14 @@ compatibility_date = "2026-09-04"
 compatibility_flags = ["nodejs_compat"]
 [vars]
 BASE_CHAIN_ID = "84532"
+BASE_RPC = "https://sepolia.base.org"
 GENLAYER_CHAIN_ID = "61997"
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 
-# Bind the account-owned Hyperdrive config here once provisioned. The origin
-# must be Supabase Direct PostgreSQL; do not substitute a Supavisor pooler.
-# [[hyperdrive]]
-# binding = "GENETIA_DB"
-# id = "<account-owned-hyperdrive-id>"
+[[queues.producers]]
+binding = "GENETIA_JOBS"
+queue = "genetia-work-items"
+
+[[hyperdrive]]
+binding = "GENETIA_DB"
+id = "5fb45c6d4ba044c9b499845a316b5fc6"

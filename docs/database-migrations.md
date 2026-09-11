@@ -1,5 +1,9 @@
 # Database migration authority and schema isolation
 
+The additive durable proposal lifecycle migration is
+`20260910090000_add_durable_proposal_lifecycle`; it remains scoped entirely
+to `genetia_app`.
+
 Genetia uses Supabase Postgres as its database and Prisma as the authoritative
 application-schema migration tool. The Prisma migrations under
 `packages/db/prisma/migrations/` define application tables, indexes, foreign

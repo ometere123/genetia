@@ -121,14 +121,27 @@ model Market {
 
 model Proposal {
   id              String @id @default(uuid()) @db.Uuid
+  proposalId      String? @unique
   proposerUserId  String @db.Uuid
   marketId        String? @db.Uuid
   proposalKey     String @unique
   revision        Int @default(0)
   canonicalTerms  Json
   bondTxHash      String @unique
+  bondBlockNumber BigInt?
+  bondLogIndex    Int?
   bondAmount      Decimal @db.Decimal(78, 0)
+  canonicalProposalHash String?
+  bondStatus      String @default("CONFIRMED")
+  admissibilityOperationId String?
+  genlayerTxId    String? @unique
+  genlayerStatus  String?
   decision        String?
+  decisionIssueCodes String[] @default([])
+  manifestHash    String?
+  resolverAddress String?
+  baseMarketAddress String?
+  workflowStatus  String @default("PENDING_BOND")
   bondDisposition String?
   proposer        User @relation(fields: [proposerUserId], references: [id])
   market          Market? @relation(fields: [marketId], references: [id])

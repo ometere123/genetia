@@ -10,6 +10,9 @@
 !**/.env.example
 !**/.env.local.example
 
+.dev.vars
+*.dev.vars
+
 # ── Node ──────────────────────────────────────────────────────────────────────
 node_modules/
 .venv/
@@ -20,6 +23,7 @@ artifacts/
 .pnpm-store/
 .corepack/
 .turbo/
+**/.wrangler/
 npm-debug.log*
 yarn-error.log*
 

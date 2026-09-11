@@ -1,0 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createAccount, createClient } from "../apps/orchestration-worker/node_modules/genlayer-js/dist/index.js";
+import { studioDevnet } from "../apps/orchestration-worker/node_modules/genlayer-js/dist/chains/index.js";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const env = Object.fromEntries(fs.readFileSync(path.join(root, ".env"), "utf8").split(/\r?\n/).filter((line) => line && !line.trim().startsWith("#")).map((line) => { const i = line.indexOf("="); return [line.slice(0, i), line.slice(i + 1).replace(/^['"]|['"]$/g, "")]; }));
+const client = createClient({ chain: studioDevnet, endpoint: "https://studio-dev.genlayer.com/api", account: createAccount(env.RESOLVER_PRIVATE_KEY || env.GENLAYER_PRIVATE_KEY) });
+const trace = await client.debugTraceTransaction({ hash: "0x9e876c11997f6e1d10bdf9b28402804884f41bace504a832528980fa5d586e2d" });
+console.log(JSON.stringify({ keys: Object.keys(trace), result_code: trace.result_code, return_data_type: typeof trace.return_data, return_data_length: typeof trace.return_data === "string" ? trace.return_data.length : null, stderr: trace.stderr, stdout: trace.stdout }));

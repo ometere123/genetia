@@ -1,5 +1,6 @@
-# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import *
+# { "Depends": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng" }
+import genlayer as gl
+from genlayer.types import *
 from datetime import datetime, timezone
 import json
 import hashlib
@@ -14,14 +15,14 @@ def _json_value(value):
     if not isinstance(parsed, dict): raise gl.vm.UserError("[LLM_ERROR] candidate must be an object")
     return parsed
 
-class MarketResolver(gl.Contract):
+class MarketResolver(gl.contract.Contract):
     manifest: str
     manifest_hash: str
     market_id: str
     resolver_release_id: str
     status: str
     last_result: str
-    attempts: TreeMap[str, str]
+    attempts: gl.storage.TreeMap[str, str]
 
     def __init__(self, locked_manifest: str, locked_hash: str, release_id: str) -> None:
         data = json.loads(locked_manifest)
@@ -64,7 +65,9 @@ class MarketResolver(gl.Contract):
             if not self._policy_valid(leader, data): return False
             validator = independent()
             return self._policy_valid(validator, data) and validator["outcome"] == leader["outcome"]
-        candidate = gl.vm.run_nondet_unsafe(independent, validate)
+        # Studio Dev v0.123/GenVM rc7 exposes the validator-backed default
+        # nondeterministic runner under this name.
+        candidate = gl.vm.run_nondet_default(independent, validate)
         if not self._policy_valid(candidate, data): raise gl.vm.UserError("[LLM_ERROR] candidate violated locked policy")
         outcome = str(candidate["outcome"])
         if attempt == 4 and outcome == "UNRESOLVED":

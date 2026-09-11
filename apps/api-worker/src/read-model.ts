@@ -89,8 +89,27 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
       return sql`SELECT * FROM "genetia_app"."Trade" WHERE lower("walletAddress") = lower(${address}) ORDER BY "createdAt" DESC LIMIT 500`;
     },
     async getProposal(proposalId) {
-      const rows = await sql`SELECT * FROM "genetia_app"."Proposal" WHERE id = ${proposalId} OR "proposalKey" = ${proposalId} LIMIT 1`;
-      return rows[0] ?? null;
+      const rows = await sql`SELECT p.*, lower(w."address") AS "proposerAddress"
+        FROM "genetia_app"."Proposal" p
+        LEFT JOIN "genetia_app"."Wallet" w ON w."userId" = p."proposerUserId" AND w."chainId" = 84532
+        WHERE p."proposalId" = ${proposalId} OR p."proposalKey" = ${proposalId} LIMIT 1`;
+      if (!rows[0]) return null;
+      const row = rows[0] as Record<string, unknown>;
+      const workflow = String(row.workflowStatus ?? "PENDING_BOND");
+      const status = row.decision === "NEEDS_REVISION" ? "NEEDS_REVISION" : row.decision === "APPROVED" ? "APPROVED" : row.decision === "REJECTED" ? "REJECTED" : workflow === "PENDING_BOND" ? "PENDING_BOND" : "ADMISSIBILITY_SUBMITTED";
+      return {
+        proposalId: row.proposalId ?? row.proposalKey,
+        proposer: row.proposerAddress,
+        status,
+        bondStatus: row.bondStatus,
+        revisionCount: Number(row.revision ?? 0),
+        workflowStatus: workflow === "PENDING_BOND" ? "NOT_STARTED" : workflow === "BOND_CONFIRMED" ? "RUNNING" : workflow === "COMPLETE" ? "COMPLETE" : workflow === "FAILED" ? "FAILED" : "WAITING_FINALITY",
+        issues: Array.isArray(row.decisionIssueCodes) ? row.decisionIssueCodes : undefined,
+        manifestHash: row.manifestHash ?? undefined,
+        resolver: row.resolverAddress ?? undefined,
+        baseMarket: row.baseMarketAddress ?? undefined,
+        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt ? String(row.updatedAt) : undefined,
+      };
     },
     async getPrices(marketId) {
       const rows = await sql`SELECT "engine", "poolYesTotal", "poolNoTotal", "lmsrB", "lmsrFundingTarget", "status" FROM "genetia_app"."Market" WHERE "marketId" = ${marketId} LIMIT 1`;

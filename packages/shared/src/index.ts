@@ -56,9 +56,41 @@ export const ResolutionRecordSchema = z.object({
   resultCommitment: HashSchema.optional(), attempt: z.number().int().min(0).max(4), submittedAt: z.string().datetime(), finalizedAt: z.string().datetime().optional(),
 });
 export const QuoteRequestSchema = z.object({ side: z.enum(["YES", "NO"]), action: z.enum(["BUY", "SELL"]), amount: AmountSchema, maxTotal: AmountSchema.optional(), minNet: AmountSchema.optional() });
-export const QuoteSchema = z.object({ shares: AmountSchema, notional: AmountSchema, fee: AmountSchema, total: AmountSchema, priceAfter: AmountSchema });
+export const QuoteSchema = z.object({
+  shares: AmountSchema, notional: AmountSchema, fee: AmountSchema, total: AmountSchema, priceAfter: AmountSchema,
+  marketId: z.string().min(1).optional(), engine: EngineSchema.optional(), action: z.enum(["BUY", "SELL"]).optional(), side: z.enum(["YES", "NO"]).optional(),
+  chainId: z.literal(84532).optional(), contract: AddressSchema.optional(), yesTotal: AmountSchema.optional(), noTotal: AmountSchema.optional(),
+  nextYesTotal: AmountSchema.optional(), nextNoTotal: AmountSchema.optional(), qYes: AmountSchema.optional(), qNo: AmountSchema.optional(), b: AmountSchema.optional(),
+  feeRateBps: z.number().int().nonnegative().optional(), quoteAt: AmountSchema.optional(),
+});
 export const TransactionPreparationSchema = z.object({ chainId: z.literal(84532), to: AddressSchema, data: z.string().regex(/^0x[a-fA-F0-9]*$/), value: z.literal("0"), marketId: z.string().min(1), engine: EngineSchema, action: z.enum(["BUY", "SELL"]), side: z.enum(["YES", "NO"]), amount: AmountSchema, approval: z.object({ token: AddressSchema, spender: AddressSchema, amount: AmountSchema }).nullable() });
 export const ProposalSchema = ResolutionManifestBase.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, lmsrB: AmountSchema.optional() });
+export const ProposalBondPreparationSchema = z.object({
+  chainId: z.literal(84532),
+  proposalId: HashSchema,
+  proposer: AddressSchema,
+  bondAmount: z.literal("2000000"),
+  approval: z.object({ token: AddressSchema, spender: AddressSchema, amount: z.literal("2000000") }),
+  lock: z.object({ to: AddressSchema, data: z.string().regex(/^0x[a-fA-F0-9]+$/), value: z.literal("0") }),
+});
+export const ProposalSubmissionSchema = z.object({
+  proposal: ProposalSchema,
+  proposer: AddressSchema,
+  bondTxHash: HashSchema,
+});
+export const ProposalStatusSchema = z.object({
+  proposalId: HashSchema,
+  proposer: AddressSchema,
+  status: z.enum(["PENDING_BOND", "ADMISSIBILITY_SUBMITTED", "NEEDS_REVISION", "APPROVED", "REJECTED"]),
+  bondStatus: z.enum(["UNCONFIRMED", "CONFIRMED", "REFUNDED", "DISPOSED", "TIMEOUT_REFUNDED"]),
+  revisionCount: z.number().int().min(0).max(2),
+  workflowStatus: z.enum(["NOT_STARTED", "RUNNING", "WAITING_FINALITY", "COMPLETE", "FAILED"]),
+  issues: z.array(z.string()).optional(),
+  manifestHash: HashSchema.optional(),
+  resolver: AddressSchema.optional(),
+  baseMarket: AddressSchema.optional(),
+  updatedAt: z.string().datetime().optional(),
+});
 
 export type Engine = z.infer<typeof EngineSchema>;
 export type Outcome = z.infer<typeof OutcomeSchema>;
@@ -70,6 +102,9 @@ export type QuoteRequest = z.infer<typeof QuoteRequestSchema>;
 export type Quote = z.infer<typeof QuoteSchema>;
 export type TransactionPreparation = z.infer<typeof TransactionPreparationSchema>;
 export type Proposal = z.infer<typeof ProposalSchema>;
+export type ProposalBondPreparation = z.infer<typeof ProposalBondPreparationSchema>;
+export type ProposalSubmission = z.infer<typeof ProposalSubmissionSchema>;
+export type ProposalStatus = z.infer<typeof ProposalStatusSchema>;
 
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -78,6 +113,10 @@ function stableJson(value: unknown): string {
   }
   if (typeof value === "number" && (!Number.isSafeInteger(value) || !Number.isFinite(value))) throw new Error("canonical manifest numbers must be safe integers");
   return JSON.stringify(value);
+}
+
+export function canonicalProposalBody(proposal: Proposal, proposer: string): string {
+  return stableJson({ proposer: proposer.toLowerCase(), proposal: { ...proposal, idempotencyKey: proposal.idempotencyKey } });
 }
 
 export function canonicalManifestBody(manifest: Record<string, unknown>): string { return stableJson(manifest); }

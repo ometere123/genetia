@@ -23,6 +23,6 @@ name = "genetia-lifecycle"
 binding = "GENETIA_WORKFLOWS"
 class_name = "GenetiaLifecycleWorkflow"
 
-# Hyperdrive is bound at deployment after the account-owned resource ID is
-# provisioned. No fabricated ID is committed here; local code uses the same
-# GENETIA_DB binding shape and dry-runs remain deployment-safe.
+[[hyperdrive]]
+binding = "GENETIA_DB"
+id = "5fb45c6d4ba044c9b499845a316b5fc6"

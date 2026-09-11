@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { Market, ResolutionRecord, Proposal, QuoteRequest, Quote, TransactionPreparation, MarketSchema, ResolutionRecordSchema, QuoteSchema, TransactionPreparationSchema } from "@genetia/shared";
+import { Market, ResolutionRecord, Proposal, QuoteRequest, Quote, TransactionPreparation, ProposalBondPreparation, ProposalStatus, MarketSchema, ResolutionRecordSchema, QuoteSchema, TransactionPreparationSchema, ProposalBondPreparationSchema, ProposalStatusSchema } from "@genetia/shared";
+export type { Proposal, ProposalBondPreparation, ProposalStatus, Quote, QuoteRequest, TransactionPreparation } from "@genetia/shared";
 export type GenetiaClientOptions = { baseUrl: string; fetch?: typeof fetch; headers?: Record<string, string> };
 export type ActivityRecord = Record<string, unknown>;
 export type MarketPage = { items: Market[]; nextCursor: string | null };
@@ -15,8 +16,8 @@ export class GenetiaClient {
     if (!r.ok) throw new Error(`${path} ${r.status}`);
     return schema.parse(await r.json());
   }
-  private async post<T>(path: string, body: unknown, schema: { parse(value: unknown): T }): Promise<T> {
-    const r = await this.request(`${this.options.baseUrl}/api${path}`, { method: "POST", headers: { "content-type": "application/json", ...this.options.headers }, body: JSON.stringify(body) });
+  private async post<T>(path: string, body: unknown, schema: { parse(value: unknown): T }, extraHeaders: Record<string, string> = {}): Promise<T> {
+    const r = await this.request(`${this.options.baseUrl}/api${path}`, { method: "POST", headers: { "content-type": "application/json", ...this.options.headers, ...extraHeaders }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error(`${path} ${r.status}`);
     return schema.parse(await r.json());
   }
@@ -34,7 +35,10 @@ export class GenetiaClient {
   async history(address:string):Promise<ActivityRecord[]>{ return this.get(`/users/${address}/history`, RecordsSchema); }
   async quote(id:string, request: QuoteRequest):Promise<Quote>{ return this.post(`/markets/${encodeURIComponent(id)}/quote`, request, QuoteSchema); }
   async prepareTrade(id:string, request: QuoteRequest):Promise<TransactionPreparation>{ return this.post(`/markets/${encodeURIComponent(id)}/prepare-trade`, request, TransactionPreparationSchema); }
-  async submitProposal(proposal: Proposal):Promise<unknown>{ return this.post("/market-proposals", proposal, { parse: (v) => v }); }
-  async proposal(id:string):Promise<ActivityRecord>{ return this.get(`/market-proposals/${encodeURIComponent(id)}`, { parse: (v) => z.record(z.unknown()).parse(v) }); }
+  async prepareProposalBond(proposal: Proposal, proposer: string): Promise<ProposalBondPreparation> {
+    return this.post("/market-proposals/prepare-bond", proposal, { parse: (v) => ProposalBondPreparationSchema.parse(v) }, { "x-wallet-address": proposer });
+  }
+  async submitProposal(proposal: Proposal, bondTxHash: `0x${string}`, proposer: string):Promise<ProposalStatus>{ return this.post("/market-proposals", { proposal, bondTxHash }, ProposalStatusSchema, { "x-wallet-address": proposer }); }
+  async proposal(id:string):Promise<ProposalStatus>{ return this.get(`/market-proposals/${encodeURIComponent(id)}`, ProposalStatusSchema); }
   async health(): Promise<Health> { return this.get("/health", HealthSchema); }
 }

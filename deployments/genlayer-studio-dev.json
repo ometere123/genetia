@@ -1,1 +1,45 @@
-{"chainId":61997,"environment":"studio-dev","status":"not-deployed","deploymentEpoch":null,"contracts":{},"sdkVersion":null,"cliVersion":null,"commitSha":null}
+{
+  "chainId": 61997,
+  "environment": "studio-dev",
+  "rpc": "https://studio-dev.genlayer.com/api",
+  "activeRelease": "market-admissibility-20260910-d487596c",
+  "releases": [
+    {
+      "releaseId": "market-admissibility-20260910-fa0ca307",
+      "status": "SUPERSEDED_FOR_NEW_PROPOSALS",
+      "address": "0xf2bfe202023f7a8E6a9a7ACA43C5FAb2b721b7A1",
+      "deploymentTx": "0xe9d14b06d1d172baa82d362626ea0d97217b79184ed1005192d79a2e874954c1",
+      "sourceSha256": "fa0ca30721a84ade051617845605bf0031d72df16c816fd73b7e642eb0bbdd92",
+      "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+      "execution": "FINISHED_WITH_RETURN",
+      "statusName": "FINALIZED"
+    },
+    {
+      "releaseId": "market-admissibility-20260910-cf74f494",
+      "status": "SUPERSEDED_FOR_NEW_PROPOSALS",
+      "address": "0x9e487b5eb7C01B331A5c3d4E75c4ECc781fF6CC4",
+      "deploymentTx": "0x185aa3cf1b2456c124092e4e19079143e18357bdcb914c1bac207dd4e7de4c29",
+      "sourceSha256": "cf74f494fabd6459826e10318c440d59acce5d965a716c46d91e760f191be651",
+      "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+      "execution": "FINISHED_WITH_RETURN",
+      "statusName": "FINALIZED",
+      "methods": ["assess", "get_assessment"]
+    },
+    {
+      "releaseId": "market-admissibility-20260910-d487596c",
+      "status": "CANONICAL",
+      "address": "0x5D21d899573ce2d09b54BB6EA4b1A39b214EA1fb",
+      "deploymentTx": "0x1e583dee09b805eb64e5ec4374c32f0ed565c6d19637b3bae02ad01c29bb3c21",
+      "sourceSha256": "d487596c5a8d6c844c080b981ecc432fd51fb1ddaaa99b80e68992bdb60483d0",
+      "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+      "execution": "FINISHED_WITH_RETURN",
+      "statusName": "FINALIZED",
+      "methods": ["assess", "get_assessment"]
+    }
+  ],
+  "sdkVersion": "2.0.0-rc.1",
+  "cliVersion": "0.40.0-rc.3",
+  "studioVersion": "v0.123.0-rc.6",
+  "genvmVersion": "v0.3.0-rc7",
+  "commitSha": "e3920a5b652f2cb107daa9de64c04e6afd3f09d3"
+}

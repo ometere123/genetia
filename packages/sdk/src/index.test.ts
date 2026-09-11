@@ -17,7 +17,7 @@ describe("GenetiaClient", () => {
   });
 
   it("covers market detail, prices, activity, proposal, positions, history, and health", async () => {
-    const responses: unknown[] = [market, { marketId: "m1", engine: "POOL", yesTotal: "1", noTotal: "2" }, [{ id: "trade" }], [{ id: "lp" }], { resolverAddress: market.resolverAddress, manifestHash: market.manifestHash, genlayerTxId: `0x${"55".repeat(32)}`, lifecycle: "FINALIZED", executionStatus: "FINISHED_WITH_RETURN", attempt: 0, submittedAt: "2026-01-01T00:00:00.000Z" }, [{ id: "evidence" }], [{ id: "position" }], [{ id: "history" }], { id: "p1" }, { ok: true, baseChainId: 84532, genlayerChainId: 61997, database: true }];
+    const responses: unknown[] = [market, { marketId: "m1", engine: "POOL", yesTotal: "1", noTotal: "2" }, [{ id: "trade" }], [{ id: "lp" }], { resolverAddress: market.resolverAddress, manifestHash: market.manifestHash, genlayerTxId: `0x${"55".repeat(32)}`, lifecycle: "FINALIZED", executionStatus: "FINISHED_WITH_RETURN", attempt: 0, submittedAt: "2026-01-01T00:00:00.000Z" }, [{ id: "evidence" }], [{ id: "position" }], [{ id: "history" }], { proposalId: `0x${"66".repeat(32)}`, proposer: market.creatorAddress, status: "PENDING_BOND", bondStatus: "CONFIRMED", revisionCount: 0, workflowStatus: "RUNNING" }, { ok: true, baseChainId: 84532, genlayerChainId: 61997, database: true }];
     const api = new GenetiaClient({ baseUrl: "https://api.example", fetch: async () => new Response(JSON.stringify(responses.shift()), { status: 200 }) });
     await expect(api.market("m1")).resolves.toMatchObject({ marketId: "m1" });
     await expect(api.prices("m1")).resolves.toMatchObject({ engine: "POOL" });
@@ -27,7 +27,7 @@ describe("GenetiaClient", () => {
     await expect(api.evidence("m1")).resolves.toHaveLength(1);
     await expect(api.positions(market.creatorAddress)).resolves.toHaveLength(1);
     await expect(api.history(market.creatorAddress)).resolves.toHaveLength(1);
-    await expect(api.proposal("p1")).resolves.toMatchObject({ id: "p1" });
+    await expect(api.proposal("p1")).resolves.toMatchObject({ status: "PENDING_BOND", bondStatus: "CONFIRMED" });
     await expect(api.health()).resolves.toMatchObject({ baseChainId: 84532 });
   });
 
@@ -37,11 +37,21 @@ describe("GenetiaClient", () => {
   });
 
   it("validates prepared transactions and quote responses", async () => {
-    const validTx = { chainId: 84532, to: market.baseAddress, data: "0x1234", value: "0" };
+    const validTx = { chainId: 84532, to: market.baseAddress, data: "0x1234", value: "0", marketId: "m1", engine: "POOL", action: "BUY", side: "YES", amount: "1", approval: null };
     const validQuote = { shares: "2", notional: "1", fee: "0", total: "1", priceAfter: "500000" };
     const responses = [validQuote, validTx];
     const api = new GenetiaClient({ baseUrl: "https://api.example", fetch: async () => new Response(JSON.stringify(responses.shift()), { status: 200 }) });
     await expect(api.quote("m1", { side: "YES", action: "BUY", amount: "1" })).resolves.toMatchObject({ shares: "2" });
     await expect(api.prepareTrade("m1", { side: "YES", action: "BUY", amount: "1" })).resolves.toMatchObject({ chainId: 84532 });
+  });
+
+  it("validates proposal bond preparation and typed proposal status", async () => {
+    const proposalId = `0x${"66".repeat(32)}`;
+    const response = { chainId: 84532, proposalId, proposer: market.creatorAddress, bondAmount: "2000000", approval: { token: market.baseAddress, spender: market.baseAddress, amount: "2000000" }, lock: { to: market.baseAddress, data: "0x1234", value: "0" } };
+    const api = client(response);
+    await expect(api.prepareProposalBond(market as never, market.creatorAddress)).resolves.toMatchObject({ bondAmount: "2000000", chainId: 84532 });
+    const state = { proposalId, proposer: market.creatorAddress, status: "PENDING_BOND", bondStatus: "CONFIRMED", revisionCount: 0, workflowStatus: "RUNNING" };
+    const statusApi = client(state);
+    await expect(statusApi.submitProposal(market as never, `0x${"77".repeat(32)}`, market.creatorAddress)).resolves.toMatchObject({ workflowStatus: "RUNNING" });
   });
 });

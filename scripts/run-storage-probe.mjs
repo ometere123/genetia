@@ -10,8 +10,8 @@ console.log(JSON.stringify({ phase: "submitting" }));
 const tx = await client.writeContract({ address, functionName: "put", args: ["alpha", "beta"], fees: { distribution: estimate.distribution, feeValue: estimate.feeValue } });
 const final = await client.waitForFinalization({ hash: tx, interval: 5000, retries: 180, fullTransaction: true });
 const reads = {};
-for (const functionName of ["get", "metadata"]) {
-  try { reads[functionName] = await client.readContract({ address, functionName, args: functionName === "get" ? ["alpha"] : [], transactionHashVariant: "latest-final" }); }
+for (const [functionName, args] of [["get", ["alpha"]], ["getMissing", ["missing"]], ["metadata", []]]) {
+  try { reads[functionName] = await client.readContract({ address, functionName: functionName === "getMissing" ? "get" : functionName, args, transactionHashVariant: "latest-final" }); }
   catch (error) { reads[functionName] = `ERROR: ${String(error).split("\\n")[0]}`; }
 }
 console.log(JSON.stringify({ tx, statusName: final.statusName, txExecutionResultName: final.txExecutionResultName, isSuccessful: isSuccessful(final), reads }));

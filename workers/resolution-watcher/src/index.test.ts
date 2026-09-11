@@ -1,7 +1,7 @@
 import { abi as genlayerAbi } from "genlayer-js";
 import type { GenLayerTransaction } from "genlayer-js/types";
 import { bytesToHex, type Hex } from "viem";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { assertWatcherEligible, canonicalEvidenceCommitment, finalizedResolutionCommitment, type FinalizedResolverState, type ResolutionEnvelope } from "./index";
 
 const txId = `0x${"11".repeat(32)}` as Hex;
@@ -15,9 +15,9 @@ const envelopeBase: Omit<ResolutionEnvelope, "resultCommitment"> = {
   marketId: `0x${"33".repeat(32)}`, baseMarket: `0x${"44".repeat(20)}`,
   baseChainId: 84532, resolver, genlayerChainId: 61997, genlayerTxId: txId,
   manifestHash: `0x${"55".repeat(32)}`, resolverReleaseId: `0x${"66".repeat(32)}`,
-  attempt: 0, outcome: 0, evidenceCommitment: canonicalEvidenceCommitment(finalizedState), gateway: `0x${"77".repeat(20)}`,
+  attempt: 0, outcome: 0, evidenceCommitment: `0x${"00".repeat(32)}`, gateway: `0x${"77".repeat(20)}`,
 };
-const envelope: ResolutionEnvelope = { ...envelopeBase, resultCommitment: finalizedResolutionCommitment({ ...envelopeBase, resultCommitment: `0x${"00".repeat(32)}` }) };
+let envelope: ResolutionEnvelope;
 const finalized = {
   txId, recipient: resolver, lifecycle: { state: "finalized", outcome: "accepted" },
   status: 7, statusName: "FINALIZED", txExecutionResult: 1,
@@ -26,21 +26,22 @@ const finalized = {
 const trace = { result_code: 1, return_data: returnData, stderr: "", finalizedState };
 
 describe("watcher finality gate", () => {
-  it("accepts only finalized successful execution", () => expect(() => assertWatcherEligible(finalized, trace, envelope)).not.toThrow());
-  it.each(["processing", "decided"])("rejects %s lifecycle", (state) => {
+  beforeAll(async () => { const evidenceCommitment = await canonicalEvidenceCommitment(finalizedState); envelope = { ...envelopeBase, evidenceCommitment, resultCommitment: finalizedResolutionCommitment({ ...envelopeBase, evidenceCommitment, resultCommitment: `0x${"00".repeat(32)}` }) }; });
+  it("accepts only finalized successful execution", async () => await expect(assertWatcherEligible(finalized, trace, envelope)).resolves.toBeUndefined());
+  it.each(["processing", "decided"])("rejects %s lifecycle", async (state) => {
     const tx = { ...finalized, lifecycle: state === "processing" ? { state, phase: "pending" } : { state, outcome: "accepted" } } as GenLayerTransaction;
-    expect(() => assertWatcherEligible(tx, trace, envelope)).toThrow("not finalized");
+    await expect(assertWatcherEligible(tx, trace, envelope)).rejects.toThrow("not finalized");
   });
-  it("rejects finalized failed execution", () => {
+  it("rejects finalized failed execution", async () => {
     const tx = { ...finalized, txExecutionResult: 2, txExecutionResultName: "FINISHED_WITH_ERROR" } as GenLayerTransaction;
-    expect(() => assertWatcherEligible(tx, trace, envelope)).toThrow("not successful");
+    await expect(assertWatcherEligible(tx, trace, envelope)).rejects.toThrow("not successful");
   });
-  it("rejects wrong resolver", () => expect(() => assertWatcherEligible(finalized, trace, { ...envelope, resolver: `0x${"88".repeat(20)}` })).toThrow("wrong resolver"));
-  it("rejects wrong transaction", () => expect(() => assertWatcherEligible(finalized, trace, { ...envelope, genlayerTxId: `0x${"99".repeat(32)}` })).toThrow("wrong transaction"));
-  it("rejects altered outcome", () => expect(() => assertWatcherEligible(finalized, trace, { ...envelope, outcome: 1 })).toThrow("altered outcome"));
-  it("rejects failed trace", () => expect(() => assertWatcherEligible(finalized, { ...trace, result_code: 2 }, envelope)).toThrow("trace was not successful"));
-  it("rejects wrong commitment", () => expect(() => assertWatcherEligible(finalized, trace, { ...envelope, resultCommitment: `0x${"aa".repeat(32)}` })).toThrow("wrong result commitment"));
-  it("rejects a trace-only commitment without finalized resolver state", () => expect(() => assertWatcherEligible(finalized, { result_code: 1, return_data: returnData, stderr: "" }, envelope)).toThrow("finalized resolver state is required"));
+  it("rejects wrong resolver", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, resolver: `0x${"88".repeat(20)}` })).rejects.toThrow("wrong resolver"));
+  it("rejects wrong transaction", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, genlayerTxId: `0x${"99".repeat(32)}` })).rejects.toThrow("wrong transaction"));
+  it("rejects altered outcome", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, outcome: 1 })).rejects.toThrow("altered outcome"));
+  it("rejects failed trace", async () => await expect(assertWatcherEligible(finalized, { ...trace, result_code: 2 }, envelope)).rejects.toThrow("trace was not successful"));
+  it("rejects wrong commitment", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, resultCommitment: `0x${"aa".repeat(32)}` })).rejects.toThrow("wrong result commitment"));
+  it("rejects a trace-only commitment without finalized resolver state", async () => await expect(assertWatcherEligible(finalized, { result_code: 1, return_data: returnData, stderr: "" }, envelope)).rejects.toThrow("finalized resolver state is required"));
   it.each([
     ["marketId", { marketId: `0x${"aa".repeat(32)}` }],
     ["baseMarket", { baseMarket: `0x${"aa".repeat(20)}` }],
@@ -54,7 +55,7 @@ describe("watcher finality gate", () => {
     ["outcome", { outcome: 1 }],
     ["evidenceCommitment", { evidenceCommitment: `0x${"aa".repeat(32)}` }],
     ["resultCommitment", { resultCommitment: `0x${"aa".repeat(32)}` }],
-  ])("rejects mutation of signed %s field", (_field, mutation) => {
-    expect(() => assertWatcherEligible(finalized, trace, { ...envelope, ...mutation } as ResolutionEnvelope)).toThrow();
+  ])("rejects mutation of signed %s field", async (_field, mutation) => {
+    await expect(assertWatcherEligible(finalized, trace, { ...envelope, ...mutation } as ResolutionEnvelope)).rejects.toThrow();
   });
 });

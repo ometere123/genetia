@@ -26,17 +26,14 @@ export type FinalizedResolverState = {
 export type Trace = { result_code: number; return_data: string; stderr: string; finalizedState?: FinalizedResolverState };
 
 function stableEvidenceJson(state: FinalizedResolverState): string {
-  return JSON.stringify({
-    marketId: state.marketId.toLowerCase(), manifestHash: state.manifestHash.toLowerCase(),
-    resolverReleaseId: state.resolverReleaseId.toLowerCase(), attempt: state.attempt,
-    outcome: state.outcome, evidence: [...state.evidence].sort((a, b) => a.identity.localeCompare(b.identity)).map((item) => ({
+  return JSON.stringify([...state.evidence].sort((a, b) => a.identity.localeCompare(b.identity)).map((item) => ({
       identity: item.identity, url: item.url, contentHash: item.contentHash.toLowerCase(),
-    })), result: state.result,
-  });
+    })));
 }
 
-export function canonicalEvidenceCommitment(state: FinalizedResolverState): Hex {
-  return keccak256(stringToHex(stableEvidenceJson(state)));
+export async function canonicalEvidenceCommitment(state: FinalizedResolverState): Promise<Hex> {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stableEvidenceJson(state)));
+  return `0x${Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as Hex;
 }
 
 export function decodeFinalOutcome(returnData: string): 0 | 1 | 2 {
@@ -49,7 +46,7 @@ export function decodeFinalOutcome(returnData: string): 0 | 1 | 2 {
   throw new Error("non-terminal GenLayer result");
 }
 
-export function assertWatcherEligible(transaction: GenLayerTransaction, trace: Trace, envelope: ResolutionEnvelope): void {
+export async function assertWatcherEligible(transaction: GenLayerTransaction, trace: Trace, envelope: ResolutionEnvelope): Promise<void> {
   const txId = transaction.txId ?? transaction.hash;
   if (txId?.toLowerCase() !== envelope.genlayerTxId.toLowerCase()) throw new Error("wrong transaction");
   const recipient = transaction.recipient ?? transaction.to_address;
@@ -64,7 +61,7 @@ export function assertWatcherEligible(transaction: GenLayerTransaction, trace: T
   if (state.resolverReleaseId.toLowerCase() !== envelope.resolverReleaseId.toLowerCase()) throw new Error("wrong resolver release state");
   if (decodeFinalOutcome(trace.return_data) !== envelope.outcome) throw new Error("altered outcome");
   if (state.attempt !== envelope.attempt || state.outcome !== (["YES", "NO", "VOID"] as const)[envelope.outcome]) throw new Error("wrong resolver result");
-  if (canonicalEvidenceCommitment(state) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
+  if (await canonicalEvidenceCommitment(state) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
   if (finalizedResolutionCommitment(envelope) !== envelope.resultCommitment) throw new Error("wrong result commitment");
 }
 
@@ -91,7 +88,7 @@ export async function attest(envelope: ResolutionEnvelope, env: Env) {
   const client = createClient({ chain: studioDevnet, endpoint: env.GENLAYER_RPC });
   const transaction = await client.getTransaction({ hash: envelope.genlayerTxId as TransactionHash });
   const trace = await client.debugTraceTransaction({ hash: envelope.genlayerTxId as TransactionHash });
-  assertWatcherEligible(transaction, trace, envelope);
+  await assertWatcherEligible(transaction, trace, envelope);
   const account = privateKeyToAccount(env.WATCHER_PRIVATE_KEY);
   const { gateway: verifyingContract, ...wireEnvelope } = envelope;
   const message = {

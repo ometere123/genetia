@@ -74,7 +74,7 @@ class MarketResolver(gl.contract.Contract):
         if attempt == 4 and outcome == "UNRESOLVED":
             outcome = "VOID"; candidate["outcome"] = "VOID"; candidate["void_reason"] = "evidence retries exhausted"
         candidate["evidence_commitment"] = "0x" + hashlib.sha256(json.dumps(candidate.get("evidence", []), sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
-        candidate["result_commitment"] = "0x" + hashlib.sha256(json.dumps({"market_id": self.market_id, "manifest_hash": self.manifest_hash, "attempt": attempt, "outcome": outcome, "evidence_commitment": candidate["evidence_commitment"]}, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        candidate["result_commitment"] = "0x" + hashlib.sha256(json.dumps({"market_id": self.market_id, "base_market": str(data.get("base_market_address", "")), "manifest_hash": self.manifest_hash, "resolver_release_id": self.resolver_release_id, "attempt": attempt, "outcome": outcome, "evidence_commitment": candidate["evidence_commitment"]}, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
         self.attempts[attempt_id] = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
         self.last_result = outcome; self.status = "RESOLVED" if outcome in ("YES", "NO", "VOID") else "UNRESOLVED"
         return outcome

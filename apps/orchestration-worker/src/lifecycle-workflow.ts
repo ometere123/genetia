@@ -19,7 +19,7 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
   async run(events: Array<WorkflowEvent<QueueJob>>, step: WorkflowStep): Promise<unknown> {
     const payload = validateQueueJob(events.at(-1)?.payload);
     const workflowKey = expectedJobKey(payload);
-    return step.do(`durable:${workflowKey}`, async () => {
+    const initial = await step.do(`durable:${workflowKey}`, async () => {
       if (!this.env.GENETIA_DB) throw new Error("Hyperdrive binding is required for lifecycle persistence");
       const pool = new Pool({ connectionString: this.env.GENETIA_DB.connectionString, max: 1 });
       try {
@@ -102,5 +102,35 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
         await pool.end();
       }
     });
+    if (payload.kind !== "market-admissibility" || initial.decision || initial.state === "FAILED") return initial;
+    let current: any = initial;
+    for (let poll = 0; poll < 12 && !current.decision && current.state !== "FAILED"; poll += 1) {
+      await step.sleep(`admissibility-finality-wait:${workflowKey}:${poll}`, "30 seconds");
+      current = await step.do(`admissibility-finality-poll:${workflowKey}:${poll}`, async () => {
+        if (!this.env.GENETIA_DB || !this.env.GENLAYER_PRIVATE_KEY || !this.env.MARKET_ADMISSIBILITY_ADDRESS) throw new Error("admissibility continuation is not configured");
+        const pool = new Pool({ connectionString: this.env.GENETIA_DB.connectionString, max: 1 });
+        try {
+          const store: AdmissibilityStore = {
+            async createIfAbsent(value) { return value; },
+            async load(operationId) {
+              const row = (await pool.query(`SELECT "state","externalId","payload" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey"=$1`, [operationId])).rows[0];
+              if (!row) return null;
+              const body = (row.payload ?? {}) as Record<string, unknown>;
+              return { proposalId: String(body.proposalId ?? payload.proposalId), operationId, lifecycle: String(row.state ?? "READY") as never, txId: row.externalId ? String(row.externalId) as never : undefined };
+            },
+            async persistSubmission() { throw new Error("finality poll cannot submit"); },
+            async persistObservation(operationId, observation) {
+              await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"=$2,"payload"="payload" || $3::jsonb,"updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, observation.lifecycle, JSON.stringify(observation)]);
+              if (observation.decision) await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"=$2,"decision"=$3,"decisionIssueCodes"=$4,"workflowStatus"=CASE WHEN $3='APPROVED' THEN 'ACTIVATING' WHEN $3='NEEDS_REVISION' THEN 'REVISION_REQUIRED' WHEN $3='REJECTED' THEN 'DISPOSITION_PENDING' ELSE 'WAITING_FINALITY' END,"updatedAt"=now() WHERE "proposalId"=$5`, [operationId, observation.lifecycle, observation.decision, observation.issues ?? [], payload.proposalId]);
+              else await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"=$2,"workflowStatus"=CASE WHEN $2='FAILED' THEN 'FAILED' ELSE 'WAITING_FINALITY' END,"updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId, observation.lifecycle]);
+            },
+          };
+          const client = createStudioAdmissibilityClient({ GENLAYER_RPC: this.env.GENLAYER_RPC, GENLAYER_PRIVATE_KEY: this.env.GENLAYER_PRIVATE_KEY, MARKET_ADMISSIBILITY_ADDRESS: this.env.MARKET_ADMISSIBILITY_ADDRESS });
+          const observation = await followAdmissibility(client, store, payload.proposalId);
+          return { ...initial, state: observation.lifecycle, decision: observation.decision };
+        } finally { await pool.end(); }
+      });
+    }
+    return current;
   }
 }

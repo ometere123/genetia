@@ -16,5 +16,16 @@
     "ProposalBondEscrow": {"address":"0xaa3ae6abc71b5873651ec0a96b8d5f99ef19edb3","deploymentTx":"0xde88c2c0a3cc518f6c9e72062ed16f3909652e5aef8c55e9690f17f3636d6535"},
     "ResolutionGateway": {"address":"0x1212c53da0f208152fce396f34f82c96bafbc74c","deploymentTx":"0x336f60423d90684549d05bccc6fa7420b80285b6d0742e500df49d7d9d028377"},
     "MarketFactory": {"address":"0x370914519fa0ad34a6138cb69f03a662137a4a9f","deploymentTx":"0x4e437953b40e6b1522550cca1df50333adf7bb24119b94fcbc8cbfe4bde13ad6"}
+  },
+  "integrationFixtures": {
+    "poolConnected": {
+      "marketId": "0x7f2d0c5f67ce146ca5d8569ffcafbde7281e2f4e60d347ff3b16a22f00d2b3eb",
+      "manifestHash": "0xa601a27cf1c9c9ddd326b0cbbd8978703900524637189d59e01866624086b83e",
+      "market": "0xfa0c448481dbf93bd25adc69bc171e2b61b6c936",
+      "createTx": "0xcba9e1971bd51ad78572bcd7ba59044223e761a0d8536d568e2ddae46077d87a",
+      "yesStakeTx": "0x6c589a1d2b74552813e6f0749b2505a25cf0d97de40927396938f36e1e052191",
+      "noStakeTx": "0xfa2c45ab19ed4c96c71e3004b9636a6616e621020bfdbf67af7e144f197340eb",
+      "status": "FUNDED_BOTH_SIDES"
+    }
   }
 }

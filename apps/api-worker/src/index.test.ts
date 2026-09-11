@@ -105,7 +105,7 @@ describe("canonical API contract", () => {
   });
 
   it("prepares and ABI-decodes a Pool stake for the user's wallet", async () => {
-    const response = await boundApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: "YES", action: "BUY", amount: "7" }) }, boundEnv);
+    const response = await boundApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test", "x-wallet-address": proposer }, body: JSON.stringify({ side: "YES", action: "BUY", amount: "7" }) }, boundEnv);
     expect(response.status).toBe(200);
     const body = await response.json() as { data: `0x${string}`; to: string; approval: unknown };
     expect(body.to).toBe(market.baseAddress);
@@ -116,7 +116,7 @@ describe("canonical API contract", () => {
   it("rejects LMSR preparation without explicit slippage protection", async () => {
     const lmsrModel = { ...model, getMarket: async (id: string) => id === "m1" ? { ...market, engine: "LMSR", lmsr: { b: "100000000", fundingTarget: "100000000", funded: "100000000", yesPrice: "500000000000000000", noPrice: "500000000000000000" } } : null } as MarketReadModel;
     const lmsrApp = createApiApp(() => lmsrModel, undefined, undefined, testAuth);
-    const response = await lmsrApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: "NO", action: "BUY", amount: "7" }) }, boundEnv);
+    const response = await lmsrApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test", "x-wallet-address": proposer }, body: JSON.stringify({ side: "NO", action: "BUY", amount: "7" }) }, boundEnv);
     expect(response.status).toBe(422);
   });
 
@@ -125,7 +125,7 @@ describe("canonical API contract", () => {
     const quoteApp = createApiApp(() => model, async () => quote, undefined, testAuth);
     const quoteResponse = await quoteApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: JSON.stringify({ side: "NO", action: "BUY", amount: "9" }) }, boundEnv);
     const quoted = await quoteResponse.json() as Quote;
-    const prepared = await quoteApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: quoted.side, action: quoted.action, amount: quoted.shares }) }, boundEnv);
+    const prepared = await quoteApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test", "x-wallet-address": proposer }, body: JSON.stringify({ side: quoted.side, action: quoted.action, amount: quoted.shares }) }, boundEnv);
     const body = await prepared.json() as { data: `0x${string}` };
     expect(decodeFunctionData({ abi: parseAbi(["function stake(bool yes, uint256 amount)"]), data: body.data })).toMatchObject({ functionName: "stake", args: [false, 9n] });
   });
@@ -137,7 +137,7 @@ describe("canonical API contract", () => {
     const quoteApp = createApiApp(() => lmsrModel, async () => quote, undefined, testAuth);
     const quoteResponse = await quoteApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: JSON.stringify({ side: "YES", action: "BUY", amount: "12", maxTotal: "101" }) }, boundEnv);
     const quoted = await quoteResponse.json() as Quote;
-    const prepared = await quoteApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: quoted.side, action: quoted.action, amount: quoted.shares, maxTotal: quoted.total }) }, boundEnv);
+    const prepared = await quoteApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test", "x-wallet-address": proposer }, body: JSON.stringify({ side: quoted.side, action: quoted.action, amount: quoted.shares, maxTotal: quoted.total }) }, boundEnv);
     const body = await prepared.json() as { data: `0x${string}` };
     expect(decodeFunctionData({ abi: parseAbi(["function buy(uint8 side, uint256 shares, uint256 maxTotal)"]), data: body.data })).toMatchObject({ functionName: "buy", args: [1, 12n, 101n] });
   });

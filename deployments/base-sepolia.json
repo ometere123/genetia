@@ -1,1 +1,20 @@
-{"chainId":84532,"status":"not-deployed","releaseId":null,"commitSha":null,"contracts":{},"safeAddress":null,"usdcAddress":null}
+{
+  "chainId": 84532,
+  "status": "deployed-testnet",
+  "releaseId": "base-protocol-20260912",
+  "commitSha": "890650eecf78b34cf52ad6692216982b7de66259",
+  "safeAddress": "0x05500AFb3667F5a006cbAe18d41CaE241e2893d3",
+  "usdcAddress": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "deploymentBlock": 46700487,
+  "contracts": {
+    "ProtocolRegistry": {"address":"0xd3f9e3fda1d61796f36b5110790cec70745de6a6","deploymentTx":"0x56346a72231924e8b22b5f5f5d5e5488ac2e1f571d514cfbd447b5ccd36ba0cb"},
+    "OutcomeTokens": {"address":"0x058631710423a39a8e9fa1854904f65e26c4c293","deploymentTx":"0xfe3508d5fe491f0f541e3d7abc2b3e3f78421a07e451a59573c3e6e79ab31323"},
+    "RiskManager": {"address":"0xa37e6baa7775e65068d1e28a210e654ec806d6fd","deploymentTx":"0x8fc21d5dedd5b0adc58c080b4cf49a08ec9b6def42025c8ce6efe03191213565"},
+    "FeeRouter": {"address":"0x67f202ff1f3a8a4171c535055200c87e4ada11e2","deploymentTx":"0x882d759aaa08142c5e6e8e2a1bc7f0c79e72ddde9e47ebe71e82f633f47dfd88"},
+    "PoolReleaseDeployer": {"address":"0x05eb43e27e3a7202899ac92c0c69d41fddc1a190","deploymentTx":"0xf623894e8f242426193299d67bef49cf3dcd62e49fad5c508ea0f46ca0fc3215"},
+    "LMSRReleaseDeployer": {"address":"0x3f8915545b7b505acd4aade8502220a1102ee19e","deploymentTx":"0xde9591572daaac26e0407e9bc08902cab489f9782dd72f6190ca525b584c5621"},
+    "ProposalBondEscrow": {"address":"0xaa3ae6abc71b5873651ec0a96b8d5f99ef19edb3","deploymentTx":"0xde88c2c0a3cc518f6c9e72062ed16f3909652e5aef8c55e9690f17f3636d6535"},
+    "ResolutionGateway": {"address":"0x1212c53da0f208152fce396f34f82c96bafbc74c","deploymentTx":"0x336f60423d90684549d05bccc6fa7420b80285b6d0742e500df49d7d9d028377"},
+    "MarketFactory": {"address":"0x370914519fa0ad34a6138cb69f03a662137a4a9f","deploymentTx":"0x4e437953b40e6b1522550cca1df50333adf7bb24119b94fcbc8cbfe4bde13ad6"}
+  }
+}

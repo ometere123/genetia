@@ -7,6 +7,14 @@ import hashlib
 
 OUTCOMES = ("YES", "NO", "VOID", "UNRESOLVED")
 
+def _evidence_commitment(evidence):
+    normalized = sorted([{"content_hash": str(item["content_hash"]).lower().replace("0x", "", 1), "identity": str(item["identity"]), "url": str(item["url"])} for item in evidence], key=lambda item: (item["identity"], item["url"], item["content_hash"]))
+    return "0x" + hashlib.sha256(json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+def _result_commitment(market_id, base_market, manifest_hash, resolver_release_id, attempt, outcome, evidence_commitment):
+    value = {"attempt": attempt, "base_market": str(base_market), "evidence_commitment": evidence_commitment.lower(), "manifest_hash": manifest_hash.lower(), "market_id": market_id, "outcome": outcome, "resolver_release_id": resolver_release_id}
+    return "0x" + hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
 def _json_value(value):
     if isinstance(value, dict): return value
     if not isinstance(value, str): raise gl.vm.UserError("[LLM_ERROR] non-JSON candidate")
@@ -73,14 +81,18 @@ class MarketResolver(gl.contract.Contract):
         outcome = str(candidate["outcome"])
         if attempt == 4 and outcome == "UNRESOLVED":
             outcome = "VOID"; candidate["outcome"] = "VOID"; candidate["void_reason"] = "evidence retries exhausted"
-        candidate["evidence_commitment"] = "0x" + hashlib.sha256(json.dumps(candidate.get("evidence", []), sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
-        candidate["result_commitment"] = "0x" + hashlib.sha256(json.dumps({"market_id": self.market_id, "base_market": str(data.get("base_market_address", "")), "manifest_hash": self.manifest_hash, "resolver_release_id": self.resolver_release_id, "attempt": attempt, "outcome": outcome, "evidence_commitment": candidate["evidence_commitment"]}, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        candidate["evidence_commitment"] = _evidence_commitment(candidate.get("evidence", []))
+        candidate["result_commitment"] = _result_commitment(self.market_id, data.get("base_market_address", ""), self.manifest_hash, self.resolver_release_id, attempt, outcome, candidate["evidence_commitment"])
         self.attempts[attempt_id] = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
         self.last_result = outcome; self.status = "RESOLVED" if outcome in ("YES", "NO", "VOID") else "UNRESOLVED"
         return outcome
 
     @gl.public.view
     def get_attempt(self, attempt_number: u256) -> str: return self.attempts.get(str(int(attempt_number)), "")
+
+    @gl.public.view
+    def get_binding_state(self) -> str:
+        return json.dumps({"market_id": self.market_id, "manifest_hash": self.manifest_hash, "resolver_release_id": self.resolver_release_id, "status": self.status, "last_result": self.last_result}, sort_keys=True, separators=(",", ":"))
 
     def _fetch_locked_evidence(self, data):
         evidence = []

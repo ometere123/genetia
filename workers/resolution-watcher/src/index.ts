@@ -1,6 +1,6 @@
 import { abi as genlayerAbi, createClient, isSuccessful } from "genlayer-js";
 import { studioDevnet } from "genlayer-js/chains";
-import type { GenLayerTransaction, TransactionHash } from "genlayer-js/types";
+import { TransactionHashVariant, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
 import { encodeAbiParameters, hexToBytes, isAddress, keccak256, stringToHex, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -21,18 +21,35 @@ export type FinalizedResolverState = {
   attempt: number;
   outcome: "YES" | "NO" | "VOID";
   evidence: Array<{ identity: string; url: string; contentHash: Hex }>;
+  resolverResultCommitment: Hex;
   result: { terminal: boolean; reason?: string };
 };
 export type Trace = { result_code: number; return_data: string; stderr: string; finalizedState?: FinalizedResolverState };
 
+function parseState(bindingValue: unknown, attemptValue: unknown): FinalizedResolverState {
+  const binding = JSON.parse(String(bindingValue));
+  const attempt = JSON.parse(String(attemptValue));
+  if (!binding || !attempt || typeof binding !== "object" || typeof attempt !== "object") throw new Error("resolver state is invalid");
+  const b = binding as Record<string, unknown>; const a = attempt as Record<string, unknown>;
+  const evidence = a.evidence;
+  if (!Array.isArray(evidence) || typeof a.evidence_commitment !== "string" || typeof a.result_commitment !== "string") throw new Error("resolver commitments are missing");
+  return { marketId: String(b.market_id) as Hex, manifestHash: String(b.manifest_hash) as Hex, resolverReleaseId: String(b.resolver_release_id) as Hex, attempt: Number(a.attempt ?? 0), outcome: String(a.outcome) as FinalizedResolverState["outcome"], evidence: evidence.map((item) => { const v = item as Record<string, unknown>; return { identity: String(v.identity), url: String(v.url), contentHash: `0x${String(v.content_hash).replace(/^0x/, "")}` as Hex }; }), resolverResultCommitment: String(a.result_commitment) as Hex, result: { terminal: b.status === "RESOLVED" } };
+}
+
 function stableEvidenceJson(state: FinalizedResolverState): string {
   return JSON.stringify([...state.evidence].sort((a, b) => a.identity.localeCompare(b.identity)).map((item) => ({
-      identity: item.identity, url: item.url, contentHash: item.contentHash.toLowerCase(),
+      content_hash: item.contentHash.toLowerCase().replace(/^0x/, ""), identity: item.identity, url: item.url,
     })));
 }
 
 export async function canonicalEvidenceCommitment(state: FinalizedResolverState): Promise<Hex> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stableEvidenceJson(state)));
+  return `0x${Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as Hex;
+}
+
+export async function canonicalResolverResultCommitment(state: FinalizedResolverState, baseMarket: Address): Promise<Hex> {
+  const preimage = JSON.stringify({ attempt: state.attempt, base_market: baseMarket.toLowerCase(), evidence_commitment: (await canonicalEvidenceCommitment(state)).toLowerCase(), manifest_hash: state.manifestHash.toLowerCase(), market_id: state.marketId.toLowerCase(), outcome: state.outcome, resolver_release_id: state.resolverReleaseId.toLowerCase() });
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(preimage));
   return `0x${Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as Hex;
 }
 
@@ -62,6 +79,7 @@ export async function assertWatcherEligible(transaction: GenLayerTransaction, tr
   if (decodeFinalOutcome(trace.return_data) !== envelope.outcome) throw new Error("altered outcome");
   if (state.attempt !== envelope.attempt || state.outcome !== (["YES", "NO", "VOID"] as const)[envelope.outcome]) throw new Error("wrong resolver result");
   if (await canonicalEvidenceCommitment(state) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
+  if ((await canonicalResolverResultCommitment(state, envelope.baseMarket)) !== state.resolverResultCommitment) throw new Error("wrong resolver result commitment");
   if (finalizedResolutionCommitment(envelope) !== envelope.resultCommitment) throw new Error("wrong result commitment");
 }
 
@@ -87,7 +105,10 @@ export async function attest(envelope: ResolutionEnvelope, env: Env) {
   if (!isAddress(envelope.baseMarket) || !isAddress(envelope.resolver) || !isAddress(envelope.gateway)) throw new Error("invalid address");
   const client = createClient({ chain: studioDevnet, endpoint: env.GENLAYER_RPC });
   const transaction = await client.getTransaction({ hash: envelope.genlayerTxId as TransactionHash });
-  const trace = await client.debugTraceTransaction({ hash: envelope.genlayerTxId as TransactionHash });
+  const rawTrace = await client.debugTraceTransaction({ hash: envelope.genlayerTxId as TransactionHash });
+  const binding = await client.readContract({ address: envelope.resolver, functionName: "get_binding_state", transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  const attempt = await client.readContract({ address: envelope.resolver, functionName: "get_attempt", args: [envelope.attempt], transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  const trace = { ...rawTrace, finalizedState: parseState(binding, attempt) };
   await assertWatcherEligible(transaction, trace, envelope);
   const account = privateKeyToAccount(env.WATCHER_PRIVATE_KEY);
   const { gateway: verifyingContract, ...wireEnvelope } = envelope;

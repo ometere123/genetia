@@ -2,14 +2,14 @@ import { abi as genlayerAbi } from "genlayer-js";
 import type { GenLayerTransaction } from "genlayer-js/types";
 import { bytesToHex, type Hex } from "viem";
 import { beforeAll, describe, expect, it } from "vitest";
-import { assertWatcherEligible, canonicalEvidenceCommitment, finalizedResolutionCommitment, type FinalizedResolverState, type ResolutionEnvelope } from "./index";
+import { assertWatcherEligible, canonicalEvidenceCommitment, canonicalResolverResultCommitment, finalizedResolutionCommitment, type FinalizedResolverState, type ResolutionEnvelope } from "./index";
 
 const txId = `0x${"11".repeat(32)}` as Hex;
 const resolver = `0x${"22".repeat(20)}` as Hex;
 const returnData = bytesToHex(genlayerAbi.calldata.encode("YES"));
 const finalizedState: FinalizedResolverState = {
   marketId: `0x${"33".repeat(32)}`, manifestHash: `0x${"55".repeat(32)}`, resolverReleaseId: `0x${"66".repeat(32)}`,
-  attempt: 0, outcome: "YES", evidence: [{ identity: "source-a", url: "https://example.com/a", contentHash: `0x${"88".repeat(32)}` }], result: { terminal: true },
+  attempt: 0, outcome: "YES", evidence: [{ identity: "source-a", url: "https://example.com/a", contentHash: `0x${"88".repeat(32)}` }], resolverResultCommitment: `0x${"00".repeat(32)}`, result: { terminal: true },
 };
 const envelopeBase: Omit<ResolutionEnvelope, "resultCommitment"> = {
   marketId: `0x${"33".repeat(32)}`, baseMarket: `0x${"44".repeat(20)}`,
@@ -26,7 +26,7 @@ const finalized = {
 const trace = { result_code: 1, return_data: returnData, stderr: "", finalizedState };
 
 describe("watcher finality gate", () => {
-  beforeAll(async () => { const evidenceCommitment = await canonicalEvidenceCommitment(finalizedState); envelope = { ...envelopeBase, evidenceCommitment, resultCommitment: finalizedResolutionCommitment({ ...envelopeBase, evidenceCommitment, resultCommitment: `0x${"00".repeat(32)}` }) }; });
+  beforeAll(async () => { const evidenceCommitment = await canonicalEvidenceCommitment(finalizedState); finalizedState.resolverResultCommitment = await canonicalResolverResultCommitment(finalizedState, envelopeBase.baseMarket); envelope = { ...envelopeBase, evidenceCommitment, resultCommitment: finalizedResolutionCommitment({ ...envelopeBase, evidenceCommitment, resultCommitment: `0x${"00".repeat(32)}` }) }; });
   it("accepts only finalized successful execution", async () => await expect(assertWatcherEligible(finalized, trace, envelope)).resolves.toBeUndefined());
   it.each(["processing", "decided"])("rejects %s lifecycle", async (state) => {
     const tx = { ...finalized, lifecycle: state === "processing" ? { state, phase: "pending" } : { state, outcome: "accepted" } } as GenLayerTransaction;

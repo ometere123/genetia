@@ -46,6 +46,8 @@ class MarketAdmissibility(gl.contract.Contract):
         # this is not a direct-mode shortcut.
         result = gl.vm.run_nondet_default(independent, validate)
         decision = str(result["decision"])
+        issues = result.get("issue_codes", [])
+        if not isinstance(issues, list): raise gl.vm.UserError("[LLM_ERROR] invalid issue codes")
         self.decisions[proposal_id] = decision
         serialized = json.dumps(result, sort_keys=True, separators=(",", ":"))
         self.assessments[proposal_id] = serialized

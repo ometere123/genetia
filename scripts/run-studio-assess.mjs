@@ -11,8 +11,8 @@ const env = Object.fromEntries(fs.readFileSync(path.join(root, ".env"), "utf8").
 }));
 const key = env.RESOLVER_PRIVATE_KEY || env.GENLAYER_PRIVATE_KEY;
 if (!key) throw new Error("missing GenLayer signer");
-const address = "0xf1935C55735b665B10C37613914B2EBE55Ac27CA";
-const proposalId = "studio-integration-proposal-008";
+const address = process.env.STUDIO_ADMISSIBILITY_ADDRESS || env.STUDIO_ADMISSIBILITY_ADDRESS || "0xf1935C55735b665B10C37613914B2EBE55Ac27CA";
+const proposalId = process.env.STUDIO_ASSESS_PROPOSAL_ID || env.STUDIO_ASSESS_PROPOSAL_ID || "studio-integration-proposal-008";
 const manifest = fs.readFileSync(path.join(root, "contracts/genlayer/fixtures/studio-assess-002.json"), "utf8");
 const client = createClient({ chain: studioDevnet, endpoint: "https://studio-dev.genlayer.com/api", account: createAccount(key) });
 const estimate = await client.estimateTransactionFeesForWrite({ address, functionName: "assess", args: [proposalId, manifest] });

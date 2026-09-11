@@ -63,7 +63,7 @@ export async function submitAdmissibilityOnce(client: AdmissibilityClient, store
 }
 export function classifyAdmissibility(transaction: GenLayerTransaction, trace?: DebugTraceResult): Pick<AdmissibilityOperation, "lifecycle" | "decision" | "issues"> & { attestable: boolean } {
   if (transaction.lifecycle.state !== "finalized") return { lifecycle: transaction.lifecycle.state === "decided" ? "ACCEPTED" : "SUBMITTED", attestable: false };
-  if (!isSuccessful(transaction) || transaction.txExecutionResultName !== "FINISHED_WITH_RETURN" || !trace || trace.result_code !== 1 || trace.stderr.length !== 0) return { lifecycle: "FAILED", attestable: false };
+  if (!isSuccessful(transaction) || transaction.txExecutionResultName !== "FINISHED_WITH_RETURN" || ((transaction as GenLayerTransaction & { result_name?: string }).result_name !== undefined && (transaction as GenLayerTransaction & { result_name?: string }).result_name !== "MAJORITY_AGREE") || !trace || trace.result_code !== 1 || trace.stderr.length !== 0) return { lifecycle: "FAILED", attestable: false };
   const decoded = genlayerAbi.calldata.decode(hexToBytes(trace.return_data as Hex));
   if (decoded !== "APPROVED" && decoded !== "NEEDS_REVISION" && decoded !== "REJECTED") return { lifecycle: "FAILED", attestable: false };
   return { lifecycle: "FINALIZED", decision: decoded, attestable: true };

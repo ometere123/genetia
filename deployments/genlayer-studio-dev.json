@@ -2,7 +2,7 @@
   "chainId": 61997,
   "environment": "studio-dev",
   "rpc": "https://studio-dev.genlayer.com/api",
-  "activeRelease": "market-admissibility-20260910-d487596c",
+  "activeRelease": "market-admissibility-20260911-3d7519d6",
   "releases": [
     {
       "releaseId": "market-admissibility-20260910-fa0ca307",
@@ -27,7 +27,7 @@
     },
     {
       "releaseId": "market-admissibility-20260910-d487596c",
-      "status": "CANONICAL",
+      "status": "SUPERSEDED_FOR_NEW_PROPOSALS",
       "address": "0x5D21d899573ce2d09b54BB6EA4b1A39b214EA1fb",
       "deploymentTx": "0x1e583dee09b805eb64e5ec4374c32f0ed565c6d19637b3bae02ad01c29bb3c21",
       "sourceSha256": "d487596c5a8d6c844c080b981ecc432fd51fb1ddaaa99b80e68992bdb60483d0",
@@ -35,6 +35,20 @@
       "execution": "FINISHED_WITH_RETURN",
       "statusName": "FINALIZED",
       "methods": ["assess", "get_assessment"]
+    },
+    {
+      "releaseId": "market-admissibility-20260911-3d7519d6",
+      "status": "CANONICAL",
+      "address": "0x8c97eEC014E1756a1fA5DDD371e2Ed23d6702838",
+      "deploymentTx": "0xb1d190e395235191d1673864dcc8a32b9794b33a16c1c682e7f1e3be408bae06",
+      "sourceSha256": "3d7519d678c815f83dfb6250064bea0a4ce6b00f75958717260a1c16e1294858",
+      "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+      "execution": "FINISHED_WITH_RETURN",
+      "statusName": "FINALIZED",
+      "methods": ["assess", "get_assessment"],
+      "verifiedAssessTx": "0x5ac25bc0e7360fd0b5a71b174e27eff7227a84a00446023b8c98f75c8470b676",
+      "verifiedProposalId": "studio-integration-proposal-010",
+      "verifiedAssessment": {"decision": "APPROVED", "issue_codes": []}
     }
   ],
   "sdkVersion": "2.0.0-rc.1",

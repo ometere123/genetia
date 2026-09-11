@@ -55,5 +55,19 @@
   "cliVersion": "0.40.0-rc.3",
   "studioVersion": "v0.123.0-rc.6",
   "genvmVersion": "v0.3.0-rc7",
+  "sharedContracts": {
+    "resolverFactory": {
+      "releaseId": "resolver-factory-20260911-5jyc",
+      "status": "CANONICAL",
+      "address": "0xb25a80D86401E43dbBE264D207CDd7B5463f73c4",
+      "deploymentTx": "0x829256f2423912e7869cbd8102cb1c38656acdda367d0baceef9c8f231a073b9",
+      "sourceSha256": "954ce47184348432b75cac96c68ba82b904bfebb708657cb1bf2de6ec1dd4617",
+      "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+      "execution": "FINISHED_WITH_RETURN",
+      "statusName": "FINALIZED",
+      "resultName": "MAJORITY_AGREE",
+      "methods": ["deploy_resolver", "get_resolver"]
+    }
+  },
   "commitSha": "e3920a5b652f2cb107daa9de64c04e6afd3f09d3"
 }

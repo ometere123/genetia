@@ -1,0 +1,22 @@
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { createAccount, createClient, isSuccessful } from "../apps/orchestration-worker/node_modules/genlayer-js/dist/index.js";
+import { studioDevnet } from "../apps/orchestration-worker/node_modules/genlayer-js/dist/chains/index.js";
+
+const root = process.cwd();
+const values = Object.fromEntries(fs.readFileSync(path.join(root, ".env"), "utf8").split(/\r?\n/).filter((line) => line && !line.startsWith("#")).map((line) => { const i = line.indexOf("="); return [line.slice(0, i), line.slice(i + 1).replace(/^['"]|['"]$/g, "")]; }));
+const key = values.RESOLVER_PRIVATE_KEY || values.GENLAYER_PRIVATE_KEY;
+if (!key) throw new Error("missing GenLayer signer");
+const code = fs.readFileSync(path.join(root, "contracts/genlayer/resolver_factory.py"), "utf8");
+const releaseId = "resolver-factory-20260911-5jyc";
+const client = createClient({ chain: studioDevnet, endpoint: "https://studio-dev.genlayer.com/api", account: createAccount(key) });
+const estimate = await client.estimateTransactionFees();
+const tx = await client.deployContract({ code, args: [releaseId], fees: { distribution: estimate.distribution, feeValue: estimate.feeValue } });
+console.log(JSON.stringify({ tx, sourceSha256: crypto.createHash("sha256").update(code).digest("hex"), feeValue: estimate.feeValue.toString() }));
+const final = await client.waitForFinalization({ hash: tx, fullTransaction: true });
+const address = final.recipient;
+const deployed = address ? await client.getContractCode(address) : "";
+const schema = address ? await client.getContractSchema(address) : null;
+console.log(JSON.stringify({ statusName: final.statusName, txExecutionResultName: final.txExecutionResultName, resultName: final.result_name, isSuccessful: isSuccessful(final), recipient: address, deployedSha256: crypto.createHash("sha256").update(deployed).digest("hex"), schema }));
+if (!address || !isSuccessful(final) || final.txExecutionResultName !== "FINISHED_WITH_RETURN" || deployed !== code) process.exit(2);

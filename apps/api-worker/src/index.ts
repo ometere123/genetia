@@ -28,7 +28,7 @@ const verifyPrivy: AuthVerifier = async (token, env) => {
   try {
     const client = new PrivyClient({ appId: env.PRIVY_APP_ID, appSecret: env.PRIVY_APP_SECRET });
     const verified = await client.utils().auth().verifyAccessToken(token);
-    return verified.userId ? { userId: verified.userId } : null;
+    return verified.user_id ? { userId: verified.user_id } : null;
   } catch { return null; }
 };
 

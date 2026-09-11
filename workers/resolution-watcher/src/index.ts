@@ -1,7 +1,7 @@
 import { abi as genlayerAbi, createClient, isSuccessful } from "genlayer-js";
 import { studioDevnet } from "genlayer-js/chains";
 import { TransactionHashVariant, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
-import { encodeAbiParameters, hexToBytes, isAddress, keccak256, stringToHex, type Address, type Hex } from "viem";
+import { hexToBytes, isAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const STUDIO_DEV_RPC = "https://studio-dev.genlayer.com/api";
@@ -16,6 +16,7 @@ export type ResolutionEnvelope = {
 };
 export type FinalizedResolverState = {
   marketId: Hex;
+  baseMarket: Address;
   manifestHash: Hex;
   resolverReleaseId: Hex;
   attempt: number;
@@ -33,13 +34,15 @@ function parseState(bindingValue: unknown, attemptValue: unknown): FinalizedReso
   const b = binding as Record<string, unknown>; const a = attempt as Record<string, unknown>;
   const evidence = a.evidence;
   if (!Array.isArray(evidence) || typeof a.evidence_commitment !== "string" || typeof a.result_commitment !== "string") throw new Error("resolver commitments are missing");
-  return { marketId: String(b.market_id) as Hex, manifestHash: String(b.manifest_hash) as Hex, resolverReleaseId: String(b.resolver_release_id) as Hex, attempt: Number(a.attempt ?? 0), outcome: String(a.outcome) as FinalizedResolverState["outcome"], evidence: evidence.map((item) => { const v = item as Record<string, unknown>; return { identity: String(v.identity), url: String(v.url), contentHash: `0x${String(v.content_hash).replace(/^0x/, "")}` as Hex }; }), resolverResultCommitment: String(a.result_commitment) as Hex, result: { terminal: b.status === "RESOLVED" } };
+  if (!Object.prototype.hasOwnProperty.call(a, "attempt") || !Number.isInteger(a.attempt) || Number(a.attempt) < 0 || Number(a.attempt) > 4) throw new Error("resolver attempt is missing or invalid");
+  if (typeof b.base_market !== "string") throw new Error("resolver base market is missing");
+  return { marketId: String(b.market_id) as Hex, baseMarket: String(b.base_market) as Address, manifestHash: String(b.manifest_hash) as Hex, resolverReleaseId: String(b.resolver_release_id) as Hex, attempt: Number(a.attempt), outcome: String(a.outcome) as FinalizedResolverState["outcome"], evidence: evidence.map((item) => { const v = item as Record<string, unknown>; return { identity: String(v.identity), url: String(v.url), contentHash: `0x${String(v.content_hash).replace(/^0x/, "")}` as Hex }; }), resolverResultCommitment: String(a.result_commitment) as Hex, result: { terminal: b.status === "RESOLVED" } };
 }
 
-function stableEvidenceJson(state: FinalizedResolverState): string {
-  return JSON.stringify([...state.evidence].sort((a, b) => a.identity.localeCompare(b.identity)).map((item) => ({
+export function stableEvidenceJson(state: FinalizedResolverState): string {
+  return JSON.stringify([...state.evidence].map((item) => ({
       content_hash: item.contentHash.toLowerCase().replace(/^0x/, ""), identity: item.identity, url: item.url,
-    })));
+    })).sort((a, b) => a.identity < b.identity ? -1 : a.identity > b.identity ? 1 : a.url < b.url ? -1 : a.url > b.url ? 1 : a.content_hash < b.content_hash ? -1 : a.content_hash > b.content_hash ? 1 : 0));
 }
 
 export async function canonicalEvidenceCommitment(state: FinalizedResolverState): Promise<Hex> {
@@ -48,7 +51,7 @@ export async function canonicalEvidenceCommitment(state: FinalizedResolverState)
 }
 
 export async function canonicalResolverResultCommitment(state: FinalizedResolverState, baseMarket: Address): Promise<Hex> {
-  const preimage = JSON.stringify({ attempt: state.attempt, base_market: baseMarket.toLowerCase(), evidence_commitment: (await canonicalEvidenceCommitment(state)).toLowerCase(), manifest_hash: state.manifestHash.toLowerCase(), market_id: state.marketId.toLowerCase(), outcome: state.outcome, resolver_release_id: state.resolverReleaseId.toLowerCase() });
+  const preimage = JSON.stringify({ attempt: state.attempt, base_market: baseMarket.toLowerCase(), evidence_commitment: (await canonicalEvidenceCommitment(state)).toLowerCase(), manifest_hash: state.manifestHash.toLowerCase(), market_id: state.marketId, outcome: state.outcome, resolver_release_id: state.resolverReleaseId.toLowerCase() });
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(preimage));
   return `0x${Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as Hex;
 }
@@ -73,22 +76,23 @@ export async function assertWatcherEligible(transaction: GenLayerTransaction, tr
   if (trace.result_code !== 1 || trace.stderr.length !== 0) throw new Error("GenVM trace was not successful");
   if (!trace.finalizedState) throw new Error("finalized resolver state is required");
   const state = trace.finalizedState;
+  if (envelope.baseChainId !== BASE_CHAIN_ID || envelope.genlayerChainId !== GENLAYER_CHAIN_ID) throw new Error("wrong chain");
   if (state.marketId.toLowerCase() !== envelope.marketId.toLowerCase()) throw new Error("wrong market state");
+  if (state.baseMarket.toLowerCase() !== envelope.baseMarket.toLowerCase()) throw new Error("wrong base market state");
   if (state.manifestHash.toLowerCase() !== envelope.manifestHash.toLowerCase()) throw new Error("wrong manifest state");
   if (state.resolverReleaseId.toLowerCase() !== envelope.resolverReleaseId.toLowerCase()) throw new Error("wrong resolver release state");
   if (decodeFinalOutcome(trace.return_data) !== envelope.outcome) throw new Error("altered outcome");
   if (state.attempt !== envelope.attempt || state.outcome !== (["YES", "NO", "VOID"] as const)[envelope.outcome]) throw new Error("wrong resolver result");
   if (await canonicalEvidenceCommitment(state) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
-  if ((await canonicalResolverResultCommitment(state, envelope.baseMarket)) !== state.resolverResultCommitment) throw new Error("wrong resolver result commitment");
-  if (finalizedResolutionCommitment(envelope) !== envelope.resultCommitment) throw new Error("wrong result commitment");
+  const resolverResultCommitment = await canonicalResolverResultCommitment(state, envelope.baseMarket);
+  if (resolverResultCommitment !== state.resolverResultCommitment.toLowerCase() || resolverResultCommitment !== envelope.resultCommitment.toLowerCase()) throw new Error("wrong result commitment");
 }
 
-export function finalizedResolutionCommitment(envelope: ResolutionEnvelope): Hex {
-  return keccak256(encodeAbiParameters(
-    [{ type: "bytes32" }, { type: "address" }, { type: "uint256" }, { type: "uint256" }, { type: "address" }, { type: "bytes32" }, { type: "bytes32" }, { type: "bytes32" }, { type: "uint8" }, { type: "uint8" }, { type: "bytes32" }],
-    [envelope.marketId, envelope.baseMarket, BigInt(envelope.baseChainId), BigInt(envelope.genlayerChainId), envelope.resolver, envelope.resolverReleaseId, envelope.manifestHash, envelope.genlayerTxId, envelope.attempt, envelope.outcome, envelope.evidenceCommitment],
-  ));
-}
+type WatcherClient = {
+  getTransaction(args: { hash: TransactionHash }): Promise<GenLayerTransaction>;
+  debugTraceTransaction(args: { hash: TransactionHash }): Promise<Omit<Trace, "finalizedState">>;
+  readContract(args: Record<string, unknown>): Promise<unknown>;
+};
 
 const envelopeTypes = { ResolutionEnvelope: [
   { name: "marketId", type: "bytes32" }, { name: "baseMarket", type: "address" },
@@ -99,11 +103,10 @@ const envelopeTypes = { ResolutionEnvelope: [
   { name: "evidenceCommitment", type: "bytes32" }, { name: "resultCommitment", type: "bytes32" },
 ] } as const;
 
-export async function attest(envelope: ResolutionEnvelope, env: Env) {
+export async function attestWithClient(envelope: ResolutionEnvelope, env: Env, client: WatcherClient) {
   if (env.GENLAYER_RPC !== STUDIO_DEV_RPC) throw new Error("wrong GenLayer network");
   if (envelope.baseChainId !== BASE_CHAIN_ID || envelope.genlayerChainId !== GENLAYER_CHAIN_ID) throw new Error("wrong chain");
   if (!isAddress(envelope.baseMarket) || !isAddress(envelope.resolver) || !isAddress(envelope.gateway)) throw new Error("invalid address");
-  const client = createClient({ chain: studioDevnet, endpoint: env.GENLAYER_RPC });
   const transaction = await client.getTransaction({ hash: envelope.genlayerTxId as TransactionHash });
   const rawTrace = await client.debugTraceTransaction({ hash: envelope.genlayerTxId as TransactionHash });
   const binding = await client.readContract({ address: envelope.resolver, functionName: "get_binding_state", transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
@@ -124,6 +127,11 @@ export async function attest(envelope: ResolutionEnvelope, env: Env) {
   // Return the wire envelope rather than the bigint-rich EIP-712 message so
   // Response.json remains standards-compliant. The signed values are identical.
   return { watcherId: env.WATCHER_ID, watcherAddress: account.address, envelope, signature };
+}
+
+export async function attest(envelope: ResolutionEnvelope, env: Env) {
+  const client = createClient({ chain: studioDevnet, endpoint: env.GENLAYER_RPC });
+  return attestWithClient(envelope, env, client as unknown as WatcherClient);
 }
 
 export default { async fetch(request: Request, env: Env): Promise<Response> {

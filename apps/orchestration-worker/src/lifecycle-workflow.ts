@@ -4,8 +4,13 @@ import { Pool } from "pg";
 import { createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
 import type { Address, Hex } from "viem";
 
-const ADMISSIBILITY_POLL_INTERVAL = "30 seconds";
-const ADMISSIBILITY_TIMEOUT_POLLS = 11_520; // 96 hours at 30-second intervals.
+// A Workflow instance must not spend one step per 30 seconds for the whole
+// protocol timeout.  The durable outbox/reconciler resumes this operation
+// after this bounded observation window using the persisted nextRunAt state.
+const ADMISSIBILITY_POLL_SCHEDULE = [
+  "30 seconds", "30 seconds", "1 minute", "1 minute",
+  "5 minutes", "5 minutes", "15 minutes", "30 minutes", "1 hour",
+] as const;
 
 export interface LifecycleWorkflowEnv {
   GENETIA_DB: Hyperdrive;
@@ -70,7 +75,7 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
             await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "externalId"=$2, "state"='SUBMITTED', "updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, txId]);
           },
           async persistObservation(operationId, observation) {
-            await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"=$2, "payload"="payload" || $3::jsonb, "updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, observation.lifecycle, JSON.stringify(observation)]);
+            await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"=CASE WHEN $2 IN ('PROCESSING','ACCEPTED','SUBMITTED') THEN 'RETRY' ELSE $2 END, "nextRunAt"=CASE WHEN $2 IN ('PROCESSING','ACCEPTED','SUBMITTED') THEN now() + interval '1 hour' ELSE NULL END, "payload"="payload" || $3::jsonb, "updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, observation.lifecycle, JSON.stringify(observation)]);
             if (observation.decision) {
               await pool.query(
                 `UPDATE "genetia_app"."Proposal"
@@ -107,8 +112,8 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
     });
     if (payload.kind !== "market-admissibility" || initial.decision || initial.state === "FAILED") return initial;
     let current: any = initial;
-    for (let poll = 0; poll < ADMISSIBILITY_TIMEOUT_POLLS && !current.decision && current.state !== "FAILED"; poll += 1) {
-      await step.sleep(`admissibility-finality-wait:${workflowKey}:${poll}`, ADMISSIBILITY_POLL_INTERVAL);
+    for (let poll = 0; poll < ADMISSIBILITY_POLL_SCHEDULE.length && !current.decision && current.state !== "FAILED"; poll += 1) {
+      await step.sleep(`admissibility-finality-wait:${workflowKey}:${poll}`, ADMISSIBILITY_POLL_SCHEDULE[poll]);
       current = await step.do(`admissibility-finality-poll:${workflowKey}:${poll}`, async () => {
         if (!this.env.GENETIA_DB || !this.env.GENLAYER_PRIVATE_KEY || !this.env.MARKET_ADMISSIBILITY_ADDRESS) throw new Error("admissibility continuation is not configured");
         const pool = new Pool({ connectionString: this.env.GENETIA_DB.connectionString, max: 1 });
@@ -123,7 +128,7 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
             },
             async persistSubmission() { throw new Error("finality poll cannot submit"); },
             async persistObservation(operationId, observation) {
-              await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"=$2,"payload"="payload" || $3::jsonb,"updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, observation.lifecycle, JSON.stringify(observation)]);
+              await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"=CASE WHEN $2 IN ('PROCESSING','ACCEPTED','SUBMITTED') THEN 'RETRY' ELSE $2 END,"nextRunAt"=CASE WHEN $2 IN ('PROCESSING','ACCEPTED','SUBMITTED') THEN now() + interval '1 hour' ELSE NULL END,"payload"="payload" || $3::jsonb,"updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, observation.lifecycle, JSON.stringify(observation)]);
               if (observation.decision) await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"=$2,"decision"=$3,"decisionIssueCodes"=$4,"workflowStatus"=CASE WHEN $3='APPROVED' THEN 'ACTIVATING' WHEN $3='NEEDS_REVISION' THEN 'REVISION_REQUIRED' WHEN $3='REJECTED' THEN 'DISPOSITION_PENDING' ELSE 'WAITING_FINALITY' END,"updatedAt"=now() WHERE "proposalId"=$5`, [operationId, observation.lifecycle, observation.decision, observation.issues ?? [], payload.proposalId]);
               else await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"=$2,"workflowStatus"=CASE WHEN $2='FAILED' THEN 'FAILED' ELSE 'WAITING_FINALITY' END,"updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId, observation.lifecycle]);
             },
@@ -134,9 +139,7 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
         } finally { await pool.end(); }
       });
     }
-    if (!current.decision && current.state !== "FAILED") {
-      throw new Error("admissibility infrastructure timeout after 96 hours");
-    }
+    if (!current.decision && current.state !== "FAILED") return { ...current, state: "WAITING_FINALITY", nextRunAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
     return current;
   }
 }

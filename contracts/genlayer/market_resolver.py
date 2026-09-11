@@ -12,7 +12,7 @@ def _evidence_commitment(evidence):
     return "0x" + hashlib.sha256(json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 def _result_commitment(market_id, base_market, manifest_hash, resolver_release_id, attempt, outcome, evidence_commitment):
-    value = {"attempt": attempt, "base_market": str(base_market), "evidence_commitment": evidence_commitment.lower(), "manifest_hash": manifest_hash.lower(), "market_id": market_id, "outcome": outcome, "resolver_release_id": resolver_release_id}
+    value = {"attempt": attempt, "base_market": str(base_market).lower(), "evidence_commitment": evidence_commitment.lower(), "manifest_hash": manifest_hash.lower(), "market_id": str(market_id), "outcome": str(outcome), "resolver_release_id": str(resolver_release_id).lower()}
     return "0x" + hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 def _json_value(value):
@@ -83,6 +83,7 @@ class MarketResolver(gl.contract.Contract):
             outcome = "VOID"; candidate["outcome"] = "VOID"; candidate["void_reason"] = "evidence retries exhausted"
         candidate["evidence_commitment"] = _evidence_commitment(candidate.get("evidence", []))
         candidate["result_commitment"] = _result_commitment(self.market_id, data.get("base_market_address", ""), self.manifest_hash, self.resolver_release_id, attempt, outcome, candidate["evidence_commitment"])
+        candidate["attempt"] = attempt
         self.attempts[attempt_id] = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
         self.last_result = outcome; self.status = "RESOLVED" if outcome in ("YES", "NO", "VOID") else "UNRESOLVED"
         return outcome
@@ -92,7 +93,8 @@ class MarketResolver(gl.contract.Contract):
 
     @gl.public.view
     def get_binding_state(self) -> str:
-        return json.dumps({"market_id": self.market_id, "manifest_hash": self.manifest_hash, "resolver_release_id": self.resolver_release_id, "status": self.status, "last_result": self.last_result}, sort_keys=True, separators=(",", ":"))
+        data = json.loads(self.manifest)
+        return json.dumps({"market_id": self.market_id, "base_market": data.get("base_market_address", ""), "manifest_hash": self.manifest_hash, "resolver_release_id": self.resolver_release_id, "status": self.status, "last_result": self.last_result}, sort_keys=True, separators=(",", ":"))
 
     def _fetch_locked_evidence(self, data):
         evidence = []

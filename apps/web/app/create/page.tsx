@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseAbi, type Address } from "viem";
 import { baseSepolia } from "viem/chains";
 import { GenetiaClient, type Proposal } from "@genetia/sdk";
+import { getAccessToken } from "@privy-io/react-auth";
 
 const categories = ["crypto", "sports", "politics", "macro", "tech/AI", "science", "business", "entertainment", "culture", "geopolitics", "internet/social"];
 const usdcAbi = parseAbi(["function approve(address spender, uint256 amount)"]);
@@ -43,7 +44,9 @@ export default function CreateMarketPage() {
     };
     try {
       setStatus("Preparing the exact 2 USDC bond transaction…");
-      const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${address}`, "x-wallet-address": address } });
+      const accessToken = await getAccessToken();
+      if (!accessToken) throw new Error("Log in with Privy before creating a market.");
+      const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });
       const prepared = await api.prepareProposalBond(proposal, address);
       const wallet = createWalletClient({ chain: baseSepolia, transport: custom(window.ethereum) });
       if (prepared.approval) {

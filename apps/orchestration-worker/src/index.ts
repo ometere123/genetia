@@ -27,7 +27,10 @@ export default {
       const supplied = request.headers.get("x-genetia-reconcile-secret");
       const tick = request.headers.get("x-genetia-reconcile-id");
       if (!supplied || !tick || !(await sameSecret(supplied, env.RECONCILE_SECRET))) return new Response("Unauthorized", { status: 401 });
-      const idempotencyKey = reconciliationKey(Date.now());
+      // The caller-provided tick is the durable scheduler identity. Do not
+      // replace it with wall-clock time: retries of the same Cron request
+      // must coalesce even when they arrive in a different five-minute bin.
+      const idempotencyKey = tick.startsWith("reconcile:") ? tick : `reconcile:${tick}`;
       ctx.waitUntil(env.GENETIA_JOBS.send({ kind: "reconcile-due-markets", idempotencyKey }));
       return Response.json({ ok: true, accepted: true, idempotencyKey });
     }

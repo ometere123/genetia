@@ -9,17 +9,27 @@ import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { canonicalProposalId, verifyBondReceipt } from "./proposal-adapter";
 import { createHyperdriveProposalPersistence } from "./proposal-persistence";
+import { PrivyClient } from "@privy-io/node";
 
-type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string };
+type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string };
 type ReadModelFactory = (db: Hyperdrive) => MarketReadModel;
 type QuoteProvider = (market: unknown, request: QuoteRequest, rpcUrl: string) => Promise<Quote>;
 export type ProposalService = {
   prepareBond: (proposal: unknown, proposer: `0x${string}`, escrow: `0x${string}`, usdc: `0x${string}`) => Promise<ProposalBondPreparation>;
   submit: (proposal: unknown, proposer: `0x${string}`, bondTxHash: `0x${string}`, env: Env) => Promise<ProposalStatus>;
 };
+export type AuthIdentity = { userId: string };
+export type AuthVerifier = (token: string, env: Env) => Promise<AuthIdentity | null>;
 const id = z.string().min(1).max(128);
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
-const auth = (value: string | undefined) => Boolean(value?.startsWith("Bearer ") && value.length > 7);
+const verifyPrivy: AuthVerifier = async (token, env) => {
+  if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET || !token) return null;
+  try {
+    const client = new PrivyClient({ appId: env.PRIVY_APP_ID, appSecret: env.PRIVY_APP_SECRET });
+    const verified = await client.utils().auth().verifyAccessToken(token);
+    return verified.userId ? { userId: verified.userId } : null;
+  } catch { return null; }
+};
 
 const defaultProposalService: ProposalService = {
   prepareBond: prepareProposalBond,
@@ -39,8 +49,13 @@ const defaultProposalService: ProposalService = {
   },
 };
 const wallet = (value: string | undefined): `0x${string}` | null => /^0x[0-9a-fA-F]{40}$/.test(value ?? "") ? value as `0x${string}` : null;
-export function createApiApp(factory: ReadModelFactory = createMarketReadModel, quoteProvider: QuoteProvider = liveQuote, proposalService: ProposalService = defaultProposalService) {
+export function createApiApp(factory: ReadModelFactory = createMarketReadModel, quoteProvider: QuoteProvider = liveQuote, proposalService: ProposalService = defaultProposalService, authVerifier: AuthVerifier = verifyPrivy) {
 const app = new Hono<{ Bindings: Env }>().basePath("/api");
+const requireAuth = async (c: any): Promise<AuthIdentity | null> => {
+  const header = c.req.header("authorization");
+  if (!header?.startsWith("Bearer ") || header.length <= 7) return null;
+  return authVerifier(header.slice(7), c.env);
+};
 app.get("/health", (c) => c.json({ ok: true, baseChainId: CHAIN.base, genlayerChainId: CHAIN.genlayer, database: Boolean(c.env.GENETIA_DB) }));
 app.get("/markets", async (c) => {
   if (!c.env.GENETIA_DB) return c.json({ error: "indexed market source is not configured" }, 503);
@@ -78,7 +93,7 @@ app.post("/markets/:id/quote", async (c) => {
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "quote is unavailable" }, 422); }
 });
 app.post("/markets/:id/prepare-trade", async (c) => {
-  if (!auth(c.req.header("authorization"))) return c.json({ error: "Privy authentication required" }, 401);
+  if (!await requireAuth(c)) return c.json({ error: "Privy authentication required" }, 401);
   if (!c.env.GENETIA_DB) return c.json({ error: "indexed market source is not configured" }, 503);
   const marketId = id.parse(c.req.param("id"));
   const market = await factory(c.env.GENETIA_DB).getMarket(marketId);
@@ -89,7 +104,7 @@ app.post("/markets/:id/prepare-trade", async (c) => {
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "trade is not eligible" }, 422); }
 });
 app.post("/market-proposals/prepare-bond", async (c) => {
-  if (!auth(c.req.header("authorization"))) return c.json({ error: "Privy authentication required" }, 401);
+  if (!await requireAuth(c)) return c.json({ error: "Privy authentication required" }, 401);
   const proposer = wallet(c.req.header("x-wallet-address"));
   if (!proposer) return c.json({ error: "valid wallet address required" }, 400);
   if (!c.env.PROPOSAL_BOND_ESCROW || !c.env.USDC_ADDRESS) return c.json({ error: "proposal bond contracts are not configured" }, 503);
@@ -99,7 +114,7 @@ app.post("/market-proposals/prepare-bond", async (c) => {
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "bond preparation failed" }, 422); }
 });
 app.post("/market-proposals", async (c) => {
-  if (!auth(c.req.header("authorization"))) return c.json({ error: "Privy authentication required" }, 401);
+  if (!await requireAuth(c)) return c.json({ error: "Privy authentication required" }, 401);
   const proposer = wallet(c.req.header("x-wallet-address"));
   if (!proposer) return c.json({ error: "valid wallet address required" }, 400);
   const body = await c.req.json().catch(() => undefined) as Record<string, unknown> | undefined;

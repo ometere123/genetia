@@ -24,6 +24,7 @@ artifacts/
 .corepack/
 .turbo/
 **/.wrangler/
+**/dist/
 npm-debug.log*
 yarn-error.log*
 

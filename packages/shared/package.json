@@ -1,1 +1,1 @@
-{"name":"@genetia/shared","private":true,"version":"0.1.0","type":"module","exports":{".":"./src/index.ts"},"scripts":{"typecheck":"tsc --noEmit"},"dependencies":{"zod":"3.23.8"}}
+{"name":"@genetia/shared","private":true,"version":"0.1.0","type":"module","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"scripts":{"build":"tsc --noEmit false --outDir dist --declaration --declarationMap false","typecheck":"tsc --noEmit"},"dependencies":{"zod":"3.23.8"}}

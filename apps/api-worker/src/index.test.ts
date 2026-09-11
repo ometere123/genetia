@@ -17,7 +17,8 @@ const model: MarketReadModel = {
   getProposal: async (id) => id === "p1" ? { id } : null,
   getPrices: async (id) => id === "m1" ? { marketId: id, engine: "POOL", yesTotal: "4", noTotal: "2" } : null,
 };
-const boundApp = createApiApp(() => model);
+const testAuth = async () => ({ userId: "did:privy:test" });
+const boundApp = createApiApp(() => model, undefined, undefined, testAuth);
 const boundEnv = { ...env, GENETIA_DB: {} as Hyperdrive };
 const escrow = `0x${"55".repeat(20)}` as `0x${string}`;
 const usdc = `0x${"66".repeat(20)}` as `0x${string}`;
@@ -73,7 +74,7 @@ describe("canonical API contract", () => {
 
   it("distinguishes an empty collection from a missing market", async () => {
     const missingModel: MarketReadModel = { ...model, getMarketCollection: async (id) => id === "m1" ? [] : null };
-    const missingApp = createApiApp(() => missingModel);
+    const missingApp = createApiApp(() => missingModel, undefined, undefined, testAuth);
     expect((await missingApp.request("http://localhost/api/markets/missing/trades", {}, boundEnv)).status).toBe(404);
     expect((await missingApp.request("http://localhost/api/markets/m1/trades", {}, boundEnv)).status).toBe(200);
     await expect((await missingApp.request("http://localhost/api/markets/m1/trades", {}, boundEnv)).json()).resolves.toEqual([]);
@@ -90,7 +91,7 @@ describe("canonical API contract", () => {
     const invalidQuote = await boundApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: "{}" }, boundEnv);
     expect(invalidQuote.status).toBe(400);
     const quote: Quote = { marketId: "m1", engine: "POOL", action: "BUY", side: "YES", shares: "1", notional: "1", fee: "0", total: "1", priceAfter: "0", yesTotal: "4", noTotal: "2", nextYesTotal: "5", nextNoTotal: "2", feeRateBps: 150, chainId: 84532, contract: market.baseAddress, quoteAt: "1700000000" };
-    const quoteApp = createApiApp(() => model, async () => quote);
+    const quoteApp = createApiApp(() => model, async () => quote, undefined, testAuth);
     const validQuote = await quoteApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: JSON.stringify({ side: "YES", action: "BUY", amount: "1" }) }, boundEnv);
     expect(validQuote.status).toBe(200);
     await expect(validQuote.json()).resolves.toMatchObject({ engine: "POOL", nextYesTotal: "5" });
@@ -114,14 +115,14 @@ describe("canonical API contract", () => {
 
   it("rejects LMSR preparation without explicit slippage protection", async () => {
     const lmsrModel = { ...model, getMarket: async (id: string) => id === "m1" ? { ...market, engine: "LMSR", lmsr: { b: "100000000", fundingTarget: "100000000", funded: "100000000", yesPrice: "500000000000000000", noPrice: "500000000000000000" } } : null } as MarketReadModel;
-    const lmsrApp = createApiApp(() => lmsrModel);
+    const lmsrApp = createApiApp(() => lmsrModel, undefined, undefined, testAuth);
     const response = await lmsrApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: "NO", action: "BUY", amount: "7" }) }, boundEnv);
     expect(response.status).toBe(422);
   });
 
   it("keeps quote and prepared Pool calldata consistent", async () => {
     const quote: Quote = { marketId: "m1", engine: "POOL", action: "BUY", side: "NO", shares: "9", notional: "9", fee: "0", total: "9", priceAfter: "0", yesTotal: "4", noTotal: "2", nextYesTotal: "4", nextNoTotal: "11", feeRateBps: 150, chainId: 84532, contract: market.baseAddress, quoteAt: "1700000000" };
-    const quoteApp = createApiApp(() => model, async () => quote);
+    const quoteApp = createApiApp(() => model, async () => quote, undefined, testAuth);
     const quoteResponse = await quoteApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: JSON.stringify({ side: "NO", action: "BUY", amount: "9" }) }, boundEnv);
     const quoted = await quoteResponse.json() as Quote;
     const prepared = await quoteApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: quoted.side, action: quoted.action, amount: quoted.shares }) }, boundEnv);
@@ -133,7 +134,7 @@ describe("canonical API contract", () => {
     const lmsrMarket = { ...market, engine: "LMSR", lmsr: { b: "100000000", fundingTarget: "100000000", funded: "100000000", yesPrice: "500000000000000000", noPrice: "500000000000000000" } };
     const lmsrModel = { ...model, getMarket: async (id: string) => id === "m1" ? lmsrMarket : null } as MarketReadModel;
     const quote: Quote = { marketId: "m1", engine: "LMSR", action: "BUY", side: "YES", shares: "12", notional: "100", fee: "1", total: "101", priceAfter: "500000000000000000", qYes: "0", qNo: "0", b: "100000000", feeRateBps: 100, chainId: 84532, contract: market.baseAddress, quoteAt: "1700000000" };
-    const quoteApp = createApiApp(() => lmsrModel, async () => quote);
+    const quoteApp = createApiApp(() => lmsrModel, async () => quote, undefined, testAuth);
     const quoteResponse = await quoteApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: JSON.stringify({ side: "YES", action: "BUY", amount: "12", maxTotal: "101" }) }, boundEnv);
     const quoted = await quoteResponse.json() as Quote;
     const prepared = await quoteApp.request("http://localhost/api/markets/m1/prepare-trade", { method: "POST", headers: { authorization: "Bearer test" }, body: JSON.stringify({ side: quoted.side, action: quoted.action, amount: quoted.shares, maxTotal: quoted.total }) }, boundEnv);
@@ -142,7 +143,7 @@ describe("canonical API contract", () => {
   });
 
   it("rejects a live quote when the provider reports stale or ineligible state", async () => {
-    const quoteApp = createApiApp(() => model, async () => { throw new Error("market is closed"); });
+    const quoteApp = createApiApp(() => model, async () => { throw new Error("market is closed"); }, undefined, testAuth);
     const response = await quoteApp.request("http://localhost/api/markets/m1/quote", { method: "POST", body: JSON.stringify({ side: "YES", action: "BUY", amount: "1" }) }, boundEnv);
     expect(response.status).toBe(422);
   });
@@ -176,7 +177,7 @@ describe("canonical API contract", () => {
   it("returns durable proposal state through the injected submission boundary", async () => {
     const status = { proposalId: `0x${"88".repeat(32)}` as `0x${string}`, proposer, status: "PENDING_BOND" as const, bondStatus: "CONFIRMED" as const, revisionCount: 0, workflowStatus: "RUNNING" as const };
     const service = { prepareBond: prepareProposalBond, submit: async () => status };
-    const submitApp = createApiApp(() => model, liveQuote, service);
+    const submitApp = createApiApp(() => model, liveQuote, service, testAuth);
     const response = await submitApp.request("http://localhost/api/market-proposals", { method: "POST", headers: { authorization: "Bearer test", "x-wallet-address": proposer }, body: JSON.stringify({ proposal, bondTxHash: `0x${"99".repeat(32)}` }) }, { ...boundEnv, BASE_RPC: env.BASE_RPC, PROPOSAL_BOND_ESCROW: escrow, USDC_ADDRESS: usdc });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ bondStatus: "CONFIRMED", workflowStatus: "RUNNING" });

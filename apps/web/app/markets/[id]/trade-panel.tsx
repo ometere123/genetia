@@ -5,7 +5,7 @@ import { baseSepolia } from "viem/chains";
 import { GenetiaClient } from "@genetia/sdk";
 
 export default function TradePanel({ marketId, engine }: { marketId: string; engine: "POOL" | "LMSR" }) {
-  const api = useMemo(() => new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "", headers: {} }), []);
+  const api = useMemo(() => new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "", headers: {} }), []);
   const [address, setAddress] = useState<Address>();
   const [side, setSide] = useState<"YES" | "NO">("YES");
   const [amount, setAmount] = useState("1000000");

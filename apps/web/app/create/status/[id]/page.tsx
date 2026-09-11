@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GenetiaClient, type ProposalStatus } from "@genetia/sdk";
 
-const api = () => new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "" });
+const api = () => new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "" });
 
 export default function ProposalStatusPage({ params }: { params: { id: string } }) {
   const [state, setState] = useState<ProposalStatus>();

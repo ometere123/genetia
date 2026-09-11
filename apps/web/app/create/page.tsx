@@ -46,7 +46,7 @@ export default function CreateMarketPage() {
       setStatus("Preparing the exact 2 USDC bond transaction…");
       const accessToken = await getAccessToken();
       if (!accessToken) throw new Error("Log in with Privy before creating a market.");
-      const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });
+      const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });
       const prepared = await api.prepareProposalBond(proposal, address);
       const wallet = createWalletClient({ chain: baseSepolia, transport: custom(window.ethereum) });
       if (prepared.approval) {

@@ -5,7 +5,7 @@ import { GenetiaClient, type ActivityRecord } from "@genetia/sdk";
 import TradePanel from "./trade-panel";
 
 export default function MarketDetail({ params }: { params: { id: string } }) {
-  const client = useMemo(() => new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "" }), []);
+  const client = useMemo(() => new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "" }), []);
   const [market, setMarket] = useState<Awaited<ReturnType<GenetiaClient["market"]>> | null>(null);
   const [prices, setPrices] = useState<ActivityRecord | null>(null);
   const [resolution, setResolution] = useState<ActivityRecord | null>(null);

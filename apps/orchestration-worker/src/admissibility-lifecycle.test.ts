@@ -2,7 +2,7 @@ import { abi as genlayerAbi } from "genlayer-js";
 import type { DebugTraceResult, GenLayerTransaction, TransactionHash } from "genlayer-js/types";
 import { bytesToHex, type Address } from "viem";
 import { describe, expect, it, vi } from "vitest";
-import { classifyAdmissibility, createStudioAdmissibilityClient, submitAdmissibilityOnce, type AdmissibilityOperation, type AdmissibilityStore } from "./admissibility-lifecycle";
+import { classifyAdmissibility, createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityOperation, type AdmissibilityStore } from "./admissibility-lifecycle";
 
 const txId = `0x${"12".repeat(32)}` as TransactionHash;
 const contract = `0x${"34".repeat(20)}` as Address;
@@ -44,4 +44,13 @@ describe("GenLayer admissibility side effects", () => {
     expect(submissions).toBe(1);
   });
   for (const decision of ["APPROVED", "NEEDS_REVISION", "REJECTED"] as const) it(`accepts finalized successful ${decision}`, () => expect(classifyAdmissibility(tx("finalized"), trace(decision))).toMatchObject({ lifecycle: "FINALIZED", decision, attestable: true }));
+  it("requires finalized get_assessment readback and persists its issue codes", async () => {
+    let state: AdmissibilityOperation | null = { proposalId: "proposal-readback", operationId: "admissibility:proposal-readback", txId, lifecycle: "SUBMITTED" };
+    let observation: Partial<AdmissibilityOperation> | undefined;
+    const store: AdmissibilityStore = { createIfAbsent: async (v) => v, load: async () => state, persistSubmission: async () => undefined, persistObservation: async (_id, patch) => { observation = patch; state = { ...state!, ...patch }; } };
+    const client = { writeContract: vi.fn(), getTransaction: vi.fn(async () => tx("finalized")), debugTraceTransaction: vi.fn(async () => trace("NEEDS_REVISION")), readAssessment: vi.fn(async () => JSON.stringify({ decision: "NEEDS_REVISION", issue_codes: ["AMBIGUOUS_SCOPE"] })) };
+    await expect(followAdmissibility(client, store, "proposal-readback")).resolves.toMatchObject({ decision: "NEEDS_REVISION", issues: ["AMBIGUOUS_SCOPE"] });
+    expect(client.readAssessment).toHaveBeenCalledWith({ address: contract, proposalId: "proposal-readback" });
+    expect(observation).toMatchObject({ decision: "NEEDS_REVISION", issues: ["AMBIGUOUS_SCOPE"] });
+  });
 });

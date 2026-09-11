@@ -1,6 +1,7 @@
 import { abi as genlayerAbi, createAccount, createClient, isSuccessful } from "genlayer-js";
 import { studioDevnet } from "genlayer-js/chains";
 import type { DebugTraceResult, GenLayerTransaction, TransactionHash } from "genlayer-js/types";
+import { TransactionHashVariant } from "genlayer-js/types";
 import { hexToBytes, type Address, type Hex } from "viem";
 
 export interface StudioAdmissibilityEnv {
@@ -21,6 +22,7 @@ export function createStudioAdmissibilityClient(env: StudioAdmissibilityEnv): Ad
     writeContract: ({ address, functionName, args }) => client.writeContract({ address, functionName, args: [...args] as never }),
     getTransaction: ({ hash }) => client.getTransaction({ hash }),
     debugTraceTransaction: ({ hash }) => client.debugTraceTransaction({ hash }),
+    readAssessment: ({ address, proposalId }) => client.readContract({ address, functionName: "get_assessment", args: [proposalId], transactionHashVariant: TransactionHashVariant.LATEST_FINAL }),
   };
 }
 
@@ -29,6 +31,7 @@ export interface AdmissibilityClient {
   writeContract(args: { address: Address; functionName: "assess"; args: readonly unknown[] }): Promise<unknown>;
   getTransaction(args: { hash: TransactionHash }): Promise<GenLayerTransaction>;
   debugTraceTransaction(args: { hash: TransactionHash }): Promise<DebugTraceResult>;
+  readAssessment?(args: { address: Address; proposalId: string }): Promise<unknown>;
 }
 export interface AdmissibilityOperation { proposalId: string; operationId: string; txId?: TransactionHash; lifecycle: "READY" | "SUBMITTING" | "SUBMITTED" | "ACCEPTED" | "FINALIZED" | "FAILED"; decision?: AdmissibilityDecision; issues?: string[]; }
 export interface AdmissibilityStore {
@@ -65,10 +68,37 @@ export function classifyAdmissibility(transaction: GenLayerTransaction, trace?: 
   if (decoded !== "APPROVED" && decoded !== "NEEDS_REVISION" && decoded !== "REJECTED") return { lifecycle: "FAILED", attestable: false };
   return { lifecycle: "FINALIZED", decision: decoded, attestable: true };
 }
+function parseAssessment(value: unknown): { decision: AdmissibilityDecision; issues: string[] } {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  if (!text) throw new Error("admissibility readback was empty");
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { throw new Error("admissibility readback was not valid JSON"); }
+  if (!parsed || typeof parsed !== "object") throw new Error("admissibility readback was not an object");
+  const record = parsed as Record<string, unknown>;
+  const decision = record.decision;
+  const issues = record.issue_codes;
+  if (decision !== "APPROVED" && decision !== "NEEDS_REVISION" && decision !== "REJECTED") throw new Error("admissibility readback has invalid decision");
+  if (!Array.isArray(issues) || issues.some((issue) => typeof issue !== "string")) throw new Error("admissibility readback has invalid issue codes");
+  if (decision === "APPROVED" && issues.length !== 0) throw new Error("approved admissibility readback contains issues");
+  if (decision !== "APPROVED" && issues.length === 0) throw new Error("non-approved admissibility readback has no issue codes");
+  return { decision, issues };
+}
 export async function followAdmissibility(client: AdmissibilityClient, store: AdmissibilityStore, proposalId: string) {
   const operationId = admissibilityOperationId(proposalId); const state = await store.load(operationId);
   if (!state?.txId) throw new Error("admissibility transaction was not persisted");
   const transaction = await client.getTransaction({ hash: state.txId });
-  const trace = transaction.lifecycle.state === "finalized" && isSuccessful(transaction) ? await client.debugTraceTransaction({ hash: state.txId }) : undefined;
-  const observation = classifyAdmissibility(transaction, trace); await store.persistObservation(operationId, observation); return { txId: state.txId, ...observation };
+  if (transaction.lifecycle.state !== "finalized") {
+    const observation = classifyAdmissibility(transaction); await store.persistObservation(operationId, observation); return { txId: state.txId, ...observation };
+  }
+  if (!isSuccessful(transaction) || transaction.txExecutionResultName !== "FINISHED_WITH_RETURN") {
+    const observation = classifyAdmissibility(transaction); await store.persistObservation(operationId, observation); return { txId: state.txId, ...observation };
+  }
+  const trace = await client.debugTraceTransaction({ hash: state.txId });
+  const base = classifyAdmissibility(transaction, trace);
+  if (!client.readAssessment) throw new Error("admissibility finalized readback is not configured");
+  const readback = parseAssessment(await client.readAssessment({ address: transaction.recipient as Address, proposalId }));
+  if (base.decision !== readback.decision) throw new Error("admissibility trace/readback decision mismatch");
+  const observation = { ...base, issues: readback.issues };
+  await store.persistObservation(operationId, observation);
+  return { txId: state.txId, ...observation };
 }

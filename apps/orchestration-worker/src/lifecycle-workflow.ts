@@ -1,7 +1,7 @@
 import { Workflow, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { expectedJobKey, validateQueueJob, type QueueJob } from "./queue-jobs";
 import { Pool } from "pg";
-import { createStudioAdmissibilityClient, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
+import { createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
 import type { Address, Hex } from "viem";
 
 export interface LifecycleWorkflowEnv {
@@ -68,11 +68,27 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
           },
           async persistObservation(operationId, observation) {
             await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"=$2, "payload"="payload" || $3::jsonb, "updatedAt"=now() WHERE "idempotencyKey"=$1`, [operationId, observation.lifecycle, JSON.stringify(observation)]);
+            if (observation.decision) {
+              await pool.query(
+                `UPDATE "genetia_app"."Proposal"
+                 SET "genlayerTxId"=(SELECT "externalId" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey"=$1),
+                     "genlayerStatus"=$2,
+                     "decision"=$3,
+                     "decisionIssueCodes"=$4,
+                     "workflowStatus"='COMPLETE',
+                     "updatedAt"=now()
+                 WHERE "proposalId"=$5`,
+                [operationId, observation.lifecycle, observation.decision, observation.issues ?? [], payload.proposalId],
+              );
+            } else if (observation.lifecycle === "FAILED") {
+              await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"='FAILED', "workflowStatus"='FAILED', "updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId]);
+            }
           },
         };
         const client = createStudioAdmissibilityClient({ GENLAYER_RPC: this.env.GENLAYER_RPC, GENLAYER_PRIVATE_KEY: this.env.GENLAYER_PRIVATE_KEY, MARKET_ADMISSIBILITY_ADDRESS: this.env.MARKET_ADMISSIBILITY_ADDRESS });
         const txId = await submitAdmissibilityOnce(client, store, { proposalId: payload.proposalId, contract: this.env.MARKET_ADMISSIBILITY_ADDRESS, manifest: typeof terms === "string" ? terms : JSON.stringify(terms) });
-        return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, txId, state: "SUBMITTED" };
+        const observation = await followAdmissibility(client, store, payload.proposalId);
+        return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, txId, state: observation.lifecycle, decision: observation.decision };
       } finally {
         await pool.end();
       }

@@ -1,7 +1,7 @@
 import { abi as genlayerAbi, createClient, isSuccessful } from "genlayer-js";
 import { studioDevnet } from "genlayer-js/chains";
 import type { GenLayerTransaction, TransactionHash } from "genlayer-js/types";
-import { encodeAbiParameters, hexToBytes, isAddress, keccak256, type Address, type Hex } from "viem";
+import { encodeAbiParameters, hexToBytes, isAddress, keccak256, stringToHex, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const STUDIO_DEV_RPC = "https://studio-dev.genlayer.com/api";
@@ -14,7 +14,30 @@ export type ResolutionEnvelope = {
   genlayerChainId: 61997; genlayerTxId: Hex; manifestHash: Hex; resolverReleaseId: Hex;
   attempt: number; outcome: 0 | 1 | 2; evidenceCommitment: Hex; resultCommitment: Hex; gateway: Address;
 };
-type Trace = { result_code: number; return_data: string; stderr: string };
+export type FinalizedResolverState = {
+  marketId: Hex;
+  manifestHash: Hex;
+  resolverReleaseId: Hex;
+  attempt: number;
+  outcome: "YES" | "NO" | "VOID";
+  evidence: Array<{ identity: string; url: string; contentHash: Hex }>;
+  result: { terminal: boolean; reason?: string };
+};
+export type Trace = { result_code: number; return_data: string; stderr: string; finalizedState?: FinalizedResolverState };
+
+function stableEvidenceJson(state: FinalizedResolverState): string {
+  return JSON.stringify({
+    marketId: state.marketId.toLowerCase(), manifestHash: state.manifestHash.toLowerCase(),
+    resolverReleaseId: state.resolverReleaseId.toLowerCase(), attempt: state.attempt,
+    outcome: state.outcome, evidence: [...state.evidence].sort((a, b) => a.identity.localeCompare(b.identity)).map((item) => ({
+      identity: item.identity, url: item.url, contentHash: item.contentHash.toLowerCase(),
+    })), result: state.result,
+  });
+}
+
+export function canonicalEvidenceCommitment(state: FinalizedResolverState): Hex {
+  return keccak256(stringToHex(stableEvidenceJson(state)));
+}
 
 export function decodeFinalOutcome(returnData: string): 0 | 1 | 2 {
   if (!/^0x[0-9a-fA-F]*$/.test(returnData)) throw new Error("invalid GenVM return data");
@@ -34,8 +57,14 @@ export function assertWatcherEligible(transaction: GenLayerTransaction, trace: T
   if (transaction.lifecycle.state !== "finalized") throw new Error("transaction is not finalized");
   if (!isSuccessful(transaction) || transaction.txExecutionResultName !== "FINISHED_WITH_RETURN") throw new Error("GenLayer execution was not successful");
   if (trace.result_code !== 1 || trace.stderr.length !== 0) throw new Error("GenVM trace was not successful");
+  if (!trace.finalizedState) throw new Error("finalized resolver state is required");
+  const state = trace.finalizedState;
+  if (state.marketId.toLowerCase() !== envelope.marketId.toLowerCase()) throw new Error("wrong market state");
+  if (state.manifestHash.toLowerCase() !== envelope.manifestHash.toLowerCase()) throw new Error("wrong manifest state");
+  if (state.resolverReleaseId.toLowerCase() !== envelope.resolverReleaseId.toLowerCase()) throw new Error("wrong resolver release state");
   if (decodeFinalOutcome(trace.return_data) !== envelope.outcome) throw new Error("altered outcome");
-  if (keccak256(trace.return_data as Hex) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
+  if (state.attempt !== envelope.attempt || state.outcome !== (["YES", "NO", "VOID"] as const)[envelope.outcome]) throw new Error("wrong resolver result");
+  if (canonicalEvidenceCommitment(state) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
   if (finalizedResolutionCommitment(envelope) !== envelope.resultCommitment) throw new Error("wrong result commitment");
 }
 

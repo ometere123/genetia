@@ -1,17 +1,21 @@
 import { abi as genlayerAbi } from "genlayer-js";
 import type { GenLayerTransaction } from "genlayer-js/types";
-import { bytesToHex, keccak256, type Hex } from "viem";
+import { bytesToHex, type Hex } from "viem";
 import { describe, expect, it } from "vitest";
-import { assertWatcherEligible, finalizedResolutionCommitment, type ResolutionEnvelope } from "./index";
+import { assertWatcherEligible, canonicalEvidenceCommitment, finalizedResolutionCommitment, type FinalizedResolverState, type ResolutionEnvelope } from "./index";
 
 const txId = `0x${"11".repeat(32)}` as Hex;
 const resolver = `0x${"22".repeat(20)}` as Hex;
 const returnData = bytesToHex(genlayerAbi.calldata.encode("YES"));
+const finalizedState: FinalizedResolverState = {
+  marketId: `0x${"33".repeat(32)}`, manifestHash: `0x${"55".repeat(32)}`, resolverReleaseId: `0x${"66".repeat(32)}`,
+  attempt: 0, outcome: "YES", evidence: [{ identity: "source-a", url: "https://example.com/a", contentHash: `0x${"88".repeat(32)}` }], result: { terminal: true },
+};
 const envelopeBase: Omit<ResolutionEnvelope, "resultCommitment"> = {
   marketId: `0x${"33".repeat(32)}`, baseMarket: `0x${"44".repeat(20)}`,
   baseChainId: 84532, resolver, genlayerChainId: 61997, genlayerTxId: txId,
   manifestHash: `0x${"55".repeat(32)}`, resolverReleaseId: `0x${"66".repeat(32)}`,
-  attempt: 0, outcome: 0, evidenceCommitment: keccak256(returnData), gateway: `0x${"77".repeat(20)}`,
+  attempt: 0, outcome: 0, evidenceCommitment: canonicalEvidenceCommitment(finalizedState), gateway: `0x${"77".repeat(20)}`,
 };
 const envelope: ResolutionEnvelope = { ...envelopeBase, resultCommitment: finalizedResolutionCommitment({ ...envelopeBase, resultCommitment: `0x${"00".repeat(32)}` }) };
 const finalized = {
@@ -19,7 +23,7 @@ const finalized = {
   status: 7, statusName: "FINALIZED", txExecutionResult: 1,
   txExecutionResultName: "FINISHED_WITH_RETURN",
 } as GenLayerTransaction;
-const trace = { result_code: 1, return_data: returnData, stderr: "" };
+const trace = { result_code: 1, return_data: returnData, stderr: "", finalizedState };
 
 describe("watcher finality gate", () => {
   it("accepts only finalized successful execution", () => expect(() => assertWatcherEligible(finalized, trace, envelope)).not.toThrow());
@@ -36,6 +40,7 @@ describe("watcher finality gate", () => {
   it("rejects altered outcome", () => expect(() => assertWatcherEligible(finalized, trace, { ...envelope, outcome: 1 })).toThrow("altered outcome"));
   it("rejects failed trace", () => expect(() => assertWatcherEligible(finalized, { ...trace, result_code: 2 }, envelope)).toThrow("trace was not successful"));
   it("rejects wrong commitment", () => expect(() => assertWatcherEligible(finalized, trace, { ...envelope, resultCommitment: `0x${"aa".repeat(32)}` })).toThrow("wrong result commitment"));
+  it("rejects a trace-only commitment without finalized resolver state", () => expect(() => assertWatcherEligible(finalized, { result_code: 1, return_data: returnData, stderr: "" }, envelope)).toThrow("finalized resolver state is required"));
   it.each([
     ["marketId", { marketId: `0x${"aa".repeat(32)}` }],
     ["baseMarket", { baseMarket: `0x${"aa".repeat(20)}` }],

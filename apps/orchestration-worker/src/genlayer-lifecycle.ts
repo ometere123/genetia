@@ -107,7 +107,7 @@ export function decodeTerminalOutcome(returnData: Hex): TerminalOutcome {
 export function classifyFinality(
   transaction: GenLayerTransaction,
   trace?: DebugTraceResult,
-): { lifecycle: ResolutionAttemptState["lifecycle"]; executionStatus?: string; outcome?: TerminalOutcome; attestable: boolean } {
+): { lifecycle: ResolutionAttemptState["lifecycle"]; executionStatus?: string; outcome?: ResolutionOutcome; attestable: boolean } {
   const lifecycle = transaction.lifecycle.state;
   if (lifecycle !== "finalized") {
     return {

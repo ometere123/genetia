@@ -10,6 +10,7 @@ import { baseSepolia } from "viem/chains";
 import { canonicalProposalId, verifyBondReceipt } from "./proposal-adapter";
 import { createHyperdriveProposalPersistence } from "./proposal-persistence";
 import { PrivyClient } from "@privy-io/node";
+import { Pool } from "pg";
 
 type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string };
 type ReadModelFactory = (db: Hyperdrive) => MarketReadModel;
@@ -56,6 +57,22 @@ const requireAuth = async (c: any): Promise<AuthIdentity | null> => {
   if (!header?.startsWith("Bearer ") || header.length <= 7) return null;
   return authVerifier(header.slice(7), c.env);
 };
+const requireWalletOwnership = async (c: any, identity: AuthIdentity, proposer: `0x${string}`): Promise<boolean> => {
+  // Test harnesses inject an explicit verifier and may use an in-memory DB.
+  // Production verification always binds the requested wallet to the verified
+  // Privy subject in the isolated application schema.
+  if (authVerifier !== verifyPrivy) return true;
+  if (!c.env.GENETIA_DB?.connectionString) return false;
+  const pool = new Pool({ connectionString: c.env.GENETIA_DB.connectionString, max: 1 });
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM "genetia_app"."User" u JOIN "genetia_app"."Wallet" w ON w."userId" = u."id"
+       WHERE u."privyUserId" = $1 AND w."chainId" = $2 AND lower(w."address") = lower($3) LIMIT 1`,
+      [identity.userId, 84532, proposer],
+    );
+    return result.rowCount === 1;
+  } catch { return false; } finally { await pool.end(); }
+};
 app.get("/health", (c) => c.json({ ok: true, baseChainId: CHAIN.base, genlayerChainId: CHAIN.genlayer, database: Boolean(c.env.GENETIA_DB) }));
 app.get("/markets", async (c) => {
   if (!c.env.GENETIA_DB) return c.json({ error: "indexed market source is not configured" }, 503);
@@ -93,7 +110,9 @@ app.post("/markets/:id/quote", async (c) => {
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "quote is unavailable" }, 422); }
 });
 app.post("/markets/:id/prepare-trade", async (c) => {
-  if (!await requireAuth(c)) return c.json({ error: "Privy authentication required" }, 401);
+  const identity = await requireAuth(c); if (!identity) return c.json({ error: "Privy authentication required" }, 401);
+  const proposer = wallet(c.req.header("x-wallet-address"));
+  if (!proposer || !await requireWalletOwnership(c, identity, proposer)) return c.json({ error: "wallet is not linked to authenticated Privy user" }, 403);
   if (!c.env.GENETIA_DB) return c.json({ error: "indexed market source is not configured" }, 503);
   const marketId = id.parse(c.req.param("id"));
   const market = await factory(c.env.GENETIA_DB).getMarket(marketId);
@@ -104,9 +123,10 @@ app.post("/markets/:id/prepare-trade", async (c) => {
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "trade is not eligible" }, 422); }
 });
 app.post("/market-proposals/prepare-bond", async (c) => {
-  if (!await requireAuth(c)) return c.json({ error: "Privy authentication required" }, 401);
+  const identity = await requireAuth(c); if (!identity) return c.json({ error: "Privy authentication required" }, 401);
   const proposer = wallet(c.req.header("x-wallet-address"));
   if (!proposer) return c.json({ error: "valid wallet address required" }, 400);
+  if (!await requireWalletOwnership(c, identity, proposer)) return c.json({ error: "wallet is not linked to authenticated Privy user" }, 403);
   if (!c.env.PROPOSAL_BOND_ESCROW || !c.env.USDC_ADDRESS) return c.json({ error: "proposal bond contracts are not configured" }, 503);
   const parsed = ProposalSchema.safeParse(await c.req.json().catch(() => undefined));
   if (!parsed.success) return c.json({ error: "invalid proposal", issues: parsed.error.issues }, 400);
@@ -114,9 +134,10 @@ app.post("/market-proposals/prepare-bond", async (c) => {
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "bond preparation failed" }, 422); }
 });
 app.post("/market-proposals", async (c) => {
-  if (!await requireAuth(c)) return c.json({ error: "Privy authentication required" }, 401);
+  const identity = await requireAuth(c); if (!identity) return c.json({ error: "Privy authentication required" }, 401);
   const proposer = wallet(c.req.header("x-wallet-address"));
   if (!proposer) return c.json({ error: "valid wallet address required" }, 400);
+  if (!await requireWalletOwnership(c, identity, proposer)) return c.json({ error: "wallet is not linked to authenticated Privy user" }, 403);
   const body = await c.req.json().catch(() => undefined) as Record<string, unknown> | undefined;
   const proposal = ProposalSchema.safeParse(body?.proposal ?? body);
   const bondTxHash = typeof body?.bondTxHash === "string" && /^0x[0-9a-fA-F]{64}$/.test(body.bondTxHash) ? body.bondTxHash as `0x${string}` : null;

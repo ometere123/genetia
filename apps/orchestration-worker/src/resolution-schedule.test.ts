@@ -15,6 +15,7 @@ describe("bounded resolution scheduling", () => {
     expect(nextResolutionAction(base({ technicalAttempt: attempt, lastTechnicalFailureAt: failedAt, now: failedAt + delay }))).toMatchObject({ kind: "RETRY_SAME_OPERATION", technicalAttempt: attempt });
   });
   it("only finalized successful transactions enter watcher collection", () => expect(nextResolutionAction(base({ finalizedSuccessfulTxId: "0xabc" }))).toMatchObject({ kind: "REQUEST_ATTESTATIONS", genlayerTxId: "0xabc" }));
+  it("advances to the next evidence attempt after successful UNRESOLVED", () => expect(nextResolutionAction(base({ evidenceAttempt: 0, lastEvidenceOutcome: "UNRESOLVED", now: 1_000_000 }))).toEqual({ kind: "WAIT", until: 1_000_000 + 1_800_000 }));
   it("permissionlessly expires at exactly plus 96 hours", () => expect(nextResolutionAction(base({ now: 1_000_000 + TERMINAL_DEADLINE_MS }))).toEqual({ kind: "EXPIRE_TO_VOID", idempotencyKey: "m1:expire:void" }));
   it("terminal settlement prevents any later replacement", () => expect(nextResolutionAction(base({ terminalSettled: true, now: 1_000_000 + TERMINAL_DEADLINE_MS }))).toEqual({ kind: "WAIT", until: Number.MAX_SAFE_INTEGER }));
 });

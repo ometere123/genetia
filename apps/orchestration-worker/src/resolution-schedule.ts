@@ -14,6 +14,9 @@ export interface ScheduleState {
   resolutionAvailableAt: number;
   now: number;
   evidenceAttempt: number;
+  /** Set after a finalized successful UNRESOLVED result; it advances the
+   * evidence schedule without classifying the external operation as failed. */
+  lastEvidenceOutcome?: "UNRESOLVED" | "YES" | "NO" | "VOID";
   technicalAttempt: number;
   lastTechnicalFailureAt?: number;
   finalizedSuccessfulTxId?: string;
@@ -36,7 +39,7 @@ export function nextResolutionAction(state: ScheduleState): ResolutionAction {
       ? { kind: "WAIT", until }
       : { kind: "RETRY_SAME_OPERATION", technicalAttempt: state.technicalAttempt, until, idempotencyKey: `${state.marketId}:technical:${state.technicalAttempt}` };
   }
-  const attempt = Math.min(state.evidenceAttempt, EVIDENCE_OFFSETS_MS.length - 1);
+  const attempt = Math.min(state.evidenceAttempt + (state.lastEvidenceOutcome === "UNRESOLVED" ? 1 : 0), EVIDENCE_OFFSETS_MS.length - 1);
   const due = state.resolutionAvailableAt + EVIDENCE_OFFSETS_MS[attempt];
   return state.now < due
     ? { kind: "WAIT", until: due }

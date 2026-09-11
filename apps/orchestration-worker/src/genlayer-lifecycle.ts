@@ -2,7 +2,8 @@ import { abi as genlayerAbi, isSuccessful } from "genlayer-js";
 import type { DebugTraceResult, GenLayerTransaction, TransactionHash } from "genlayer-js/types";
 import { hexToBytes, type Address, type Hex } from "viem";
 
-export type TerminalOutcome = "YES" | "NO" | "VOID";
+export type ResolutionOutcome = "YES" | "NO" | "VOID" | "UNRESOLVED";
+export type TerminalOutcome = Exclude<ResolutionOutcome, "UNRESOLVED">;
 
 export interface ResolutionAttemptState {
   idempotencyKey: string;
@@ -11,7 +12,7 @@ export interface ResolutionAttemptState {
   submittedAt?: string;
   lifecycle: "READY" | "SUBMITTED" | "ACCEPTED" | "FINALIZED" | "FAILED";
   executionStatus?: string;
-  outcome?: TerminalOutcome;
+  outcome?: ResolutionOutcome;
 }
 
 export interface AttemptStore {
@@ -89,10 +90,18 @@ export async function submitOnce(
   return txId;
 }
 
-export function decodeTerminalOutcome(returnData: Hex): TerminalOutcome {
+export function decodeResolutionOutcome(returnData: Hex): ResolutionOutcome {
   const decoded = genlayerAbi.calldata.decode(hexToBytes(returnData));
-  if (decoded === "YES" || decoded === "NO" || decoded === "VOID") return decoded;
-  throw new Error("finalized resolver returned a non-terminal result");
+  if (decoded === "YES" || decoded === "NO" || decoded === "VOID" || decoded === "UNRESOLVED") return decoded;
+  throw new Error("finalized resolver returned an invalid resolution result");
+}
+
+/** UNRESOLVED is a successful, nonterminal evidence result. It must advance
+ * the evidence schedule; it is not a failed GenLayer operation. */
+export function decodeTerminalOutcome(returnData: Hex): TerminalOutcome {
+  const outcome = decodeResolutionOutcome(returnData);
+  if (outcome === "UNRESOLVED") throw new Error("resolution is nonterminal; schedule the next evidence attempt");
+  return outcome;
 }
 
 export function classifyFinality(
@@ -113,7 +122,8 @@ export function classifyFinality(
   if (!trace || trace.result_code !== 1 || trace.stderr.length !== 0) {
     return { lifecycle: "FAILED", executionStatus: "TRACE_FAILED", attestable: false };
   }
-  const outcome = decodeTerminalOutcome(trace.return_data as Hex);
+  const outcome = decodeResolutionOutcome(trace.return_data as Hex);
+  if (outcome === "UNRESOLVED") return { lifecycle: "FINALIZED", executionStatus: "FINISHED_WITH_RETURN", outcome, attestable: false };
   return { lifecycle: "FINALIZED", executionStatus: "FINISHED_WITH_RETURN", outcome, attestable: true };
 }
 

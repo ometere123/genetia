@@ -1,4 +1,3 @@
-import { reconciliationKey } from "./runtime-state";
 import { classifyQueueError } from "./queue-jobs";
 import { GenetiaLifecycleWorkflow } from "./lifecycle-workflow";
 import { dispatchQueueJob } from "./queue-dispatch";
@@ -16,10 +15,6 @@ async function sameSecret(provided: string, expected: string): Promise<boolean> 
 }
 
 export default {
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    const idempotencyKey = reconciliationKey(Date.now());
-    ctx.waitUntil(env.GENETIA_JOBS.send({ kind: "reconcile-due-markets", idempotencyKey }));
-  },
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
     if (url.pathname === "/reconcile") {

@@ -27,6 +27,9 @@ describe("Studio Dev finality boundary", () => {
       lifecycle: "FINALIZED", executionStatus: "FINISHED_WITH_RETURN", outcome, attestable: true,
     }));
   }
+  it("treats UNRESOLVED as successful nonterminal evidence", () => expect(classifyFinality(transaction("finalized"), trace("UNRESOLVED"))).toEqual({
+    lifecycle: "FINALIZED", executionStatus: "FINISHED_WITH_RETURN", outcome: "UNRESOLVED", attestable: false,
+  }));
   it("Finalized execution with a failed GenVM trace cannot settle Base", () => expect(classifyFinality(transaction("finalized"), trace("YES", { result_code: 0 }))).toMatchObject({ lifecycle: "FAILED", attestable: false }));
 });
 

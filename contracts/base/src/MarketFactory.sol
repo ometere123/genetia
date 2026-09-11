@@ -2,10 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
-import {PoolMarket} from "./PoolMarket.sol";
-import {LMSRMarket} from "./LMSRMarket.sol";
-import {LMSRLiquidityVault} from "./LMSRLiquidityVault.sol";
 import {IOutcomeTokens, IFeeRouter, IRiskManager, IResolutionGateway} from "./interfaces/IGenetia.sol";
 
 interface IProtocolRegistry {
@@ -14,9 +10,13 @@ interface IProtocolRegistry {
 }
 
 interface IPoolReleaseDeployer {
+    struct PoolArgs { bytes32 marketId; bytes32 releaseId; address token; address creator; address feeRouter; address riskManager; address gateway; bytes32 manifestHash; address resolver; uint256 closeTime; uint256 resolutionAvailableTime; uint256 terminalDeadline; bytes32 salt; }
+    function predictPool(PoolArgs calldata) external view returns (address);
     function deployPool(bytes32, bytes32, address, address, address, address, address, bytes32, address, uint256, uint256, uint256, bytes32) external returns (address);
 }
 interface ILMSRReleaseDeployer {
+    struct LMSRArgs { bytes32 marketId; bytes32 releaseId; address token; address outcomeTokens; address feeRouter; address riskManager; address gateway; address creator; bytes32 manifestHash; address resolver; uint256 b; uint256 closeTime; uint256 resolutionAvailableTime; uint256 terminalDeadline; uint256 fundingDeadline; bytes32 marketSalt; bytes32 vaultSalt; }
+    function predictLMSR(LMSRArgs calldata) external view returns (address, address);
     function deployLMSR(bytes32, bytes32, address, address, address, address, address, address, bytes32, address, uint256, uint256, uint256, uint256, uint256, bytes32, bytes32) external returns (address, address);
 }
 
@@ -86,19 +86,14 @@ contract MarketFactory is AccessControl {
 
     function predictPoolAddress(MarketTerms calldata terms) external view returns (address) {
         (address implementation,,,) = registry.releases(terms.financialReleaseId);
-        bytes memory initCode = abi.encodePacked(
-            type(PoolMarket).creationCode,
-            abi.encode(terms.marketId, terms.financialReleaseId, usdc, terms.creator, address(feeRouter), address(riskManager), address(gateway), terms.manifestHash, terms.resolver, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline)
-        );
-        return Create2.computeAddress(_salt(terms), keccak256(initCode), implementation);
+        IPoolReleaseDeployer.PoolArgs memory a = IPoolReleaseDeployer.PoolArgs(terms.marketId, terms.financialReleaseId, usdc, terms.creator, address(feeRouter), address(riskManager), address(gateway), terms.manifestHash, terms.resolver, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline, _salt(terms));
+        return IPoolReleaseDeployer(implementation).predictPool(a);
     }
 
     function predictLMSRAddresses(MarketTerms calldata terms, uint256 b, uint256 fundingDeadline) external view returns (address market, address vault) {
         (address implementation,,,) = registry.releases(terms.financialReleaseId);
-        bytes memory marketCode = abi.encodePacked(type(LMSRMarket).creationCode, abi.encode(terms.marketId, terms.financialReleaseId, usdc, address(outcomeTokens), address(feeRouter), address(riskManager), address(gateway), terms.creator, terms.manifestHash, terms.resolver, b, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline));
-        market = Create2.computeAddress(_lmsrMarketSalt(terms), keccak256(marketCode), implementation);
-        bytes memory vaultCode = abi.encodePacked(type(LMSRLiquidityVault).creationCode, abi.encode(usdc, market, address(riskManager), _fundingTarget(b), fundingDeadline));
-        vault = Create2.computeAddress(_vaultSalt(terms), keccak256(vaultCode), implementation);
+        ILMSRReleaseDeployer.LMSRArgs memory a = ILMSRReleaseDeployer.LMSRArgs(terms.marketId, terms.financialReleaseId, usdc, address(outcomeTokens), address(feeRouter), address(riskManager), address(gateway), terms.creator, terms.manifestHash, terms.resolver, b, terms.closeTime, terms.resolutionAvailableTime, terms.terminalDeadline, fundingDeadline, _lmsrMarketSalt(terms), _vaultSalt(terms));
+        return ILMSRReleaseDeployer(implementation).predictLMSR(a);
     }
 
     function createLMSR(MarketTerms calldata terms, uint256 b, uint256 fundingDeadline)

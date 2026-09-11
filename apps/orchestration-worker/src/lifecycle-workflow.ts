@@ -75,13 +75,22 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
                      "genlayerStatus"=$2,
                      "decision"=$3,
                      "decisionIssueCodes"=$4,
-                     "workflowStatus"='COMPLETE',
+                     "workflowStatus"=CASE
+                       WHEN $3='APPROVED' THEN 'ACTIVATING'
+                       WHEN $3='NEEDS_REVISION' THEN 'REVISION_REQUIRED'
+                       WHEN $3='REJECTED' THEN 'DISPOSITION_PENDING'
+                       ELSE 'WAITING_FINALITY'
+                     END,
                      "updatedAt"=now()
                  WHERE "proposalId"=$5`,
                 [operationId, observation.lifecycle, observation.decision, observation.issues ?? [], payload.proposalId],
               );
             } else if (observation.lifecycle === "FAILED") {
               await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"='FAILED', "workflowStatus"='FAILED', "updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId]);
+            } else if (observation.lifecycle === "FINALIZED") {
+              await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"='FINALIZED', "workflowStatus"='WAITING_FINALITY', "updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId]);
+            } else {
+              await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"=$2, "workflowStatus"='WAITING_FINALITY', "updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId, observation.lifecycle]);
             }
           },
         };

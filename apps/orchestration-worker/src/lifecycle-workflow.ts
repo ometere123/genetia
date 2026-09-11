@@ -4,6 +4,9 @@ import { Pool } from "pg";
 import { createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
 import type { Address, Hex } from "viem";
 
+const ADMISSIBILITY_POLL_INTERVAL = "30 seconds";
+const ADMISSIBILITY_TIMEOUT_POLLS = 11_520; // 96 hours at 30-second intervals.
+
 export interface LifecycleWorkflowEnv {
   GENETIA_DB: Hyperdrive;
   GENETIA_JOBS: Queue;
@@ -104,8 +107,8 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
     });
     if (payload.kind !== "market-admissibility" || initial.decision || initial.state === "FAILED") return initial;
     let current: any = initial;
-    for (let poll = 0; poll < 12 && !current.decision && current.state !== "FAILED"; poll += 1) {
-      await step.sleep(`admissibility-finality-wait:${workflowKey}:${poll}`, "30 seconds");
+    for (let poll = 0; poll < ADMISSIBILITY_TIMEOUT_POLLS && !current.decision && current.state !== "FAILED"; poll += 1) {
+      await step.sleep(`admissibility-finality-wait:${workflowKey}:${poll}`, ADMISSIBILITY_POLL_INTERVAL);
       current = await step.do(`admissibility-finality-poll:${workflowKey}:${poll}`, async () => {
         if (!this.env.GENETIA_DB || !this.env.GENLAYER_PRIVATE_KEY || !this.env.MARKET_ADMISSIBILITY_ADDRESS) throw new Error("admissibility continuation is not configured");
         const pool = new Pool({ connectionString: this.env.GENETIA_DB.connectionString, max: 1 });
@@ -130,6 +133,9 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
           return { ...initial, state: observation.lifecycle, decision: observation.decision };
         } finally { await pool.end(); }
       });
+    }
+    if (!current.decision && current.state !== "FAILED") {
+      throw new Error("admissibility infrastructure timeout after 96 hours");
     }
     return current;
   }

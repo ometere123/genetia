@@ -14,8 +14,8 @@ import {MarketFactory} from "../src/MarketFactory.sol";
 
 contract DeployBaseSepolia is Script {
     address constant USDC = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
-    bytes32 constant POOL_RELEASE = keccak256("pool-release-20260912");
-    bytes32 constant LMSR_RELEASE = keccak256("lmsr-release-20260912");
+    bytes32 constant POOL_RELEASE = keccak256("genetia.pool.create2-excludes-resolution-binding.2026-09-12");
+    bytes32 constant LMSR_RELEASE = keccak256("genetia.lmsr.create2-excludes-resolution-binding.2026-09-12");
 
     function run() external returns (address factory) {
         uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");

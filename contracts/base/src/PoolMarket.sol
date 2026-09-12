@@ -19,8 +19,9 @@ contract PoolMarket is ReentrancyGuard {
     IFeeRouter public immutable feeRouter;
     IRiskManager public immutable riskManager;
     address public immutable gateway;
-    bytes32 public immutable manifestHash;
-    address public immutable resolver;
+    address public immutable factory;
+    bytes32 public manifestHash;
+    address public resolver;
     uint256 public immutable closeTime;
     uint256 public immutable resolutionAvailableTime;
     uint256 public immutable terminalDeadline;
@@ -42,17 +43,24 @@ contract PoolMarket is ReentrancyGuard {
 
     constructor(
         bytes32 marketId_, bytes32 releaseId_, address token, address creator_, address feeRouter_, address riskManager_,
-        address gateway_, bytes32 manifestHash_, address resolver_, uint256 closeTime_, uint256 resolutionAvailableTime_,
+        address gateway_, uint256 closeTime_, uint256 resolutionAvailableTime_,
         uint256 terminalDeadline_
     ) {
-        require(token != address(0) && gateway_ != address(0) && resolver_ != address(0), "address");
+        require(token != address(0) && gateway_ != address(0), "address");
         require(closeTime_ > block.timestamp && resolutionAvailableTime_ >= closeTime_, "time");
         require(terminalDeadline_ == resolutionAvailableTime_ + 96 hours, "deadline");
-        marketId = marketId_; releaseId = releaseId_; usdc = IERC20(token); creator = creator_;
+        marketId = marketId_; releaseId = releaseId_; usdc = IERC20(token); creator = creator_; factory = msg.sender;
         feeRouter = IFeeRouter(feeRouter_); riskManager = IRiskManager(riskManager_); gateway = gateway_;
-        manifestHash = manifestHash_; resolver = resolver_; closeTime = closeTime_;
+        closeTime = closeTime_;
         resolutionAvailableTime = resolutionAvailableTime_; terminalDeadline = terminalDeadline_;
         usdc.forceApprove(feeRouter_, type(uint256).max);
+    }
+
+    function bindResolution(address resolver_, bytes32 manifestHash_) external {
+        require(msg.sender == factory && resolver == address(0) && manifestHash == bytes32(0), "binding");
+        require(resolver_ != address(0) && manifestHash_ != bytes32(0), "binding values");
+        resolver = resolver_;
+        manifestHash = manifestHash_;
     }
 
     function stake(bool yes, uint256 amount) external nonReentrant {

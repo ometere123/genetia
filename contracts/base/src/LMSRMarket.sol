@@ -27,8 +27,8 @@ contract LMSRMarket is ReentrancyGuard {
     address public immutable gateway;
     address public immutable creator;
     address public immutable factory;
-    bytes32 public immutable manifestHash;
-    address public immutable resolver;
+    bytes32 public manifestHash;
+    address public resolver;
     uint256 public immutable b;
     uint256 public immutable fundingTarget;
     uint256 public immutable closeTime;
@@ -52,7 +52,7 @@ contract LMSRMarket is ReentrancyGuard {
 
     constructor(
         bytes32 marketId_, bytes32 releaseId_, address token, address outcomeTokens_, address feeRouter_,
-        address riskManager_, address gateway_, address creator_, bytes32 manifestHash_, address resolver_,
+        address riskManager_, address gateway_, address creator_,
         uint256 b_, uint256 closeTime_, uint256 resolutionAvailableTime_, uint256 terminalDeadline_
     ) {
         require(b_ >= MIN_B && b_ <= MAX_B, "b");
@@ -60,7 +60,7 @@ contract LMSRMarket is ReentrancyGuard {
         require(terminalDeadline_ == resolutionAvailableTime_ + 96 hours, "deadline");
         marketId = marketId_; releaseId = releaseId_; usdc = IERC20(token); tokens = IOutcomeTokens(outcomeTokens_);
         feeRouter = IFeeRouter(feeRouter_); riskManager = IRiskManager(riskManager_); gateway = gateway_;
-        creator = creator_; factory = msg.sender; manifestHash = manifestHash_; resolver = resolver_; b = b_;
+        creator = creator_; factory = msg.sender; b = b_;
         fundingTarget = calculateFundingTarget(b_); closeTime = closeTime_; resolutionAvailableTime = resolutionAvailableTime_;
         terminalDeadline = terminalDeadline_; status = Status.FUNDING;
         usdc.forceApprove(feeRouter_, type(uint256).max);
@@ -75,6 +75,13 @@ contract LMSRMarket is ReentrancyGuard {
     function bindVault(address vault_) external {
         require(msg.sender == factory && address(vault) == address(0) && vault_ != address(0), "vault");
         vault = LMSRLiquidityVault(vault_);
+    }
+
+    function bindResolution(address resolver_, bytes32 manifestHash_) external {
+        require(msg.sender == factory && resolver == address(0) && manifestHash == bytes32(0), "binding");
+        require(resolver_ != address(0) && manifestHash_ != bytes32(0), "binding values");
+        resolver = resolver_;
+        manifestHash = manifestHash_;
     }
 
     function activate(uint256 funding) external {

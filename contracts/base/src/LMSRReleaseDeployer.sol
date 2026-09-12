@@ -8,7 +8,7 @@ contract LMSRReleaseDeployer {
     function predictLMSR(LMSRArgs calldata a) external view returns (address market, address vault) {
         bytes memory marketCode = abi.encodePacked(
             type(LMSRMarket).creationCode,
-            abi.encode(a.marketId, a.releaseId, a.token, a.outcomeTokens, a.feeRouter, a.riskManager, a.gateway, a.creator, a.manifestHash, a.resolver, a.b, a.closeTime, a.resolutionAvailableTime, a.terminalDeadline)
+            abi.encode(a.marketId, a.releaseId, a.token, a.outcomeTokens, a.feeRouter, a.riskManager, a.gateway, a.creator, a.b, a.closeTime, a.resolutionAvailableTime, a.terminalDeadline)
         );
         market = Create2.computeAddress(a.marketSalt, keccak256(marketCode), address(this));
         bytes memory vaultCode = abi.encodePacked(
@@ -19,9 +19,10 @@ contract LMSRReleaseDeployer {
     }
 
     function deployLMSR(bytes32 marketId, bytes32 releaseId, address token, address outcomeTokens, address feeRouter, address riskManager, address gateway, address creator, bytes32 manifestHash, address resolver, uint256 b, uint256 closeTime, uint256 resolutionAvailableTime, uint256 terminalDeadline, uint256 fundingDeadline, bytes32 marketSalt, bytes32 vaultSalt) external returns (address market, address vault) {
-        LMSRMarket marketInstance = new LMSRMarket{salt: marketSalt}(marketId, releaseId, token, outcomeTokens, feeRouter, riskManager, gateway, creator, manifestHash, resolver, b, closeTime, resolutionAvailableTime, terminalDeadline);
+        LMSRMarket marketInstance = new LMSRMarket{salt: marketSalt}(marketId, releaseId, token, outcomeTokens, feeRouter, riskManager, gateway, creator, b, closeTime, resolutionAvailableTime, terminalDeadline);
         LMSRLiquidityVault vaultInstance = new LMSRLiquidityVault{salt: vaultSalt}(token, address(marketInstance), riskManager, marketInstance.fundingTarget(), fundingDeadline);
         marketInstance.bindVault(address(vaultInstance));
+        marketInstance.bindResolution(resolver, manifestHash);
         return (address(marketInstance), address(vaultInstance));
     }
 

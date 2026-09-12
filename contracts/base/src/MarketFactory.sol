@@ -133,10 +133,12 @@ contract MarketFactory is AccessControl {
     }
 
     function _salt(MarketTerms calldata terms) internal pure returns (bytes32) {
-        return keccak256(abi.encode("GENETIA_MARKET", terms.marketId, terms.financialReleaseId, terms.manifestHash));
+        // The manifest commits to the predicted Base address. Including the
+        // manifest hash in this CREATE2 salt makes that prediction circular.
+        return keccak256(abi.encode("GENETIA_MARKET", terms.marketId, terms.financialReleaseId));
     }
     function _lmsrMarketSalt(MarketTerms calldata terms) internal pure returns (bytes32) { return _salt(terms); }
-    function _vaultSalt(MarketTerms calldata terms) internal pure returns (bytes32) { return keccak256(abi.encode("GENETIA_VAULT", terms.marketId, terms.financialReleaseId, terms.manifestHash)); }
+    function _vaultSalt(MarketTerms calldata terms) internal pure returns (bytes32) { return keccak256(abi.encode("GENETIA_VAULT", terms.marketId, terms.financialReleaseId)); }
     function _fundingTarget(uint256 b) internal pure returns (uint256) {
         uint256 target = (b * 693147180559945309 * 110 + (100 * 1e18 - 1)) / (100 * 1e18);
         return target < 100e6 ? 100e6 : target;

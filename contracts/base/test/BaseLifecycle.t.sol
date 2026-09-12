@@ -98,6 +98,23 @@ contract BaseLifecycleTest is Test {
         assertEq(PoolMarket(deployed).releaseId(), POOL_RELEASE);
     }
 
+    function testCreate2AddressCanBePredictedBeforeManifestHashExists() public {
+        MarketFactory.MarketTerms memory first = terms(keccak256("manifest-address-cycle"), POOL_RELEASE);
+        MarketFactory.MarketTerms memory second = first;
+        second.manifestHash = keccak256("manifest including the predicted address");
+        second.resolver = address(0x987654);
+        assertEq(factory.predictPoolAddress(first), factory.predictPoolAddress(second));
+
+        MarketFactory.MarketTerms memory lmsrFirst = terms(keccak256("lmsr-manifest-address-cycle"), LMSR_RELEASE);
+        MarketFactory.MarketTerms memory lmsrSecond = lmsrFirst;
+        lmsrSecond.manifestHash = keccak256("lmsr manifest including predicted address");
+        lmsrSecond.resolver = address(0x876543);
+        (address firstMarket, address firstVault) = factory.predictLMSRAddresses(lmsrFirst, 250e6, block.timestamp + 12 hours);
+        (address secondMarket, address secondVault) = factory.predictLMSRAddresses(lmsrSecond, 250e6, block.timestamp + 12 hours);
+        assertEq(firstMarket, secondMarket);
+        assertEq(firstVault, secondVault);
+    }
+
     function testCreate2LMSRPairPredictionEqualsDeployment() public {
         MarketFactory.MarketTerms memory t = terms(keccak256("create2-lmsr"), LMSR_RELEASE);
         uint256 b = 250e6;

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseAbi, type Address } from "viem";
 import { baseSepolia } from "viem/chains";
 import { GenetiaClient, type Proposal } from "@genetia/sdk";
-import { getAccessToken } from "@privy-io/react-auth";
+import { getAccessToken, useWallets } from "@privy-io/react-auth";
 
 const categories = ["crypto", "sports", "politics", "macro", "tech/AI", "science", "business", "entertainment", "culture", "geopolitics", "internet/social"];
 const usdcAbi = parseAbi(["function approve(address spender, uint256 amount)"]);
@@ -15,19 +15,21 @@ export default function CreateMarketPage() {
   const [address, setAddress] = useState<Address>();
   const [status, setStatus] = useState("");
   const [bondTx, setBondTx] = useState<string>();
+  const { wallets } = useWallets();
 
   async function connect() {
-    if (!window.ethereum) return setStatus("Install a user-owned EVM wallet to create a market.");
-    const wallet = createWalletClient({ chain: baseSepolia, transport: custom(window.ethereum) });
-    const [account] = await wallet.requestAddresses();
-    if ((await wallet.getChainId()) !== baseSepolia.id) await wallet.switchChain({ id: baseSepolia.id });
-    setAddress(account);
-    setStatus(`Connected ${account.slice(0, 6)}…${account.slice(-4)} on Base Sepolia.`);
+    const selected = wallets[0];
+    if (!selected) return setStatus("Connect an embedded or external wallet with Privy first.");
+    if (selected.chainId !== `eip155:${baseSepolia.id}`) await selected.switchChain(baseSepolia.id);
+    setAddress(selected.address as Address);
+    setStatus(`Connected ${selected.address.slice(0, 6)}…${selected.address.slice(-4)} on Base Sepolia.`);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!address || !window.ethereum) return setStatus("Connect a wallet first.");
+    if (!address) return setStatus("Connect a wallet first.");
+    const selected = wallets.find((wallet) => wallet.address.toLowerCase() === address.toLowerCase()) ?? wallets[0];
+    if (!selected) return setStatus("Connect an embedded or external wallet with Privy first.");
     const form = new FormData(event.currentTarget);
     const close = Math.floor(new Date(String(form.get("closeTime"))).getTime() / 1000);
     const resolution = Math.floor(new Date(String(form.get("resolutionTime"))).getTime() / 1000);
@@ -48,7 +50,7 @@ export default function CreateMarketPage() {
       if (!accessToken) throw new Error("Log in with Privy before creating a market.");
       const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });
       const prepared = await api.prepareProposalBond(proposal, address);
-      const wallet = createWalletClient({ chain: baseSepolia, transport: custom(window.ethereum) });
+      const wallet = createWalletClient({ chain: baseSepolia, transport: custom(await selected.getEthereumProvider()) });
       if (prepared.approval) {
         setStatus("USDC approval required. Confirm it in your wallet…");
         const approvalHash = await wallet.sendTransaction({ account: address, to: prepared.approval.token as Address, data: encodeFunctionData({ abi: usdcAbi, functionName: "approve", args: [prepared.approval.spender as Address, BigInt(prepared.approval.amount)] }), value: 0n, chain: baseSepolia });

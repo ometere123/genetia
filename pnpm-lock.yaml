@@ -108,6 +108,9 @@ importers:
       '@privy-io/react-auth':
         specifier: ^3.26.0
         version: 3.40.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.5.4)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.5.4)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.5.4)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.5.4))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.102.8)(@tanstack/react-query@5.102.8(react@18.3.1))(@types/react@18.3.28)(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@10.2.2)(typescript@5.5.4)(use-sync-external-store@1.4.0(react@18.3.1))(utf-8-validate@5.0.10)(zod@3.25.76)
+      '@reown/appkit':
+        specifier: 1.7.8
+        version: 1.7.8(@types/react@18.3.28)(bufferutil@4.1.0)(react@18.3.1)(typescript@5.5.4)(utf-8-validate@5.0.10)(zod@3.25.76)
       '@tanstack/react-query':
         specifier: ^5.51.0
         version: 5.102.8(react@18.3.1)
@@ -11827,7 +11830,7 @@ snapshots:
       '@typescript-eslint/parser': 8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4)
       eslint: 8.57.0(supports-color@10.2.2)
       eslint-import-resolver-node: 0.3.10(supports-color@10.2.2)
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2))(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.57.0(supports-color@10.2.2))
       eslint-plugin-react: 7.37.5(eslint@8.57.0(supports-color@10.2.2))
@@ -11847,7 +11850,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2))(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3(supports-color@10.2.2)
@@ -11885,7 +11888,7 @@ snapshots:
       '@typescript-eslint/parser': 8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4)
       eslint: 8.57.0(supports-color@10.2.2)
       eslint-import-resolver-node: 0.3.10(supports-color@10.2.2)
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2))(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
 

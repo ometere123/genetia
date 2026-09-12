@@ -14,14 +14,15 @@ describe("durable queue contracts", () => {
   });
 
   it("creates one durable Workflow instance from a validated queue job", async () => {
-    const calls: Array<[string, unknown]> = [];
+    const calls: Array<{ id: string; params: unknown }> = [];
     const id = await dispatchQueueJob(
       { kind: "market-admissibility", proposalId: "p1", idempotencyKey: "admissibility:p1" },
-      { GENETIA_WORKFLOWS: { create: async (...args: [string, unknown]) => { calls.push(args); } } },
+      { GENETIA_WORKFLOWS: { create: async (options: { id: string; params: unknown }) => { calls.push(options); } } },
     );
     expect(id).toBe("genetia-admissibility:p1");
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.[0]).toBe(id);
+    expect(calls[0]?.id).toBe(id);
+    expect(calls[0]?.params).toMatchObject({ proposalId: "p1", kind: "market-admissibility" });
   });
 
   it("treats a duplicate Workflow instance as successful delivery", async () => {

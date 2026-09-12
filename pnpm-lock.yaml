@@ -85,8 +85,8 @@ importers:
         version: 3.23.8
     devDependencies:
       '@cloudflare/workers-types':
-        specifier: 4.20240925.0
-        version: 4.20240925.0
+        specifier: 5.20260911.1
+        version: 5.20260911.1
       '@types/pg':
         specifier: 8.15.5
         version: 8.15.5
@@ -98,7 +98,7 @@ importers:
         version: 2.1.9(@types/node@22.7.5)(supports-color@10.2.2)
       wrangler:
         specifier: 4.129.0
-        version: 4.129.0(@cloudflare/workers-types@4.20240925.0)(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+        version: 4.129.0(@cloudflare/workers-types@5.20260911.1)(bufferutil@4.1.0)(utf-8-validate@5.0.10)
 
   apps/web:
     dependencies:
@@ -315,6 +315,9 @@ packages:
 
   '@cloudflare/workers-types@4.20240925.0':
     resolution: {integrity: sha512-KpqyRWvanEuXgBTKYFzRp4NsWOEcswxjsPRSre1zYQcODmc8PUrraVHQUmgvkJgv3FzB+vI9xm7J6oE4MmZHCA==}
+
+  '@cloudflare/workers-types@5.20260911.1':
+    resolution: {integrity: sha512-yiAvknjulcU85B3yB4aKOn9+l+garWP+AbHgsdCFckeRYDdhZ1rPULi64BDf52R3VTaKqxi47kF+o9ZbjsCt5g==}
 
   '@coinbase/cdp-sdk@1.55.0':
     resolution: {integrity: sha512-5PbUg3n3Jk9nm8nEStskRv6jTrVZKkgwxMFjW+i/xUDDzK1fXksKwXdjgUiHB1hf0FZx1LiYBosrh4IULxFyPA==}
@@ -6480,6 +6483,8 @@ snapshots:
 
   '@cloudflare/workers-types@4.20240925.0': {}
 
+  '@cloudflare/workers-types@5.20260911.1': {}
+
   '@coinbase/cdp-sdk@1.55.0(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(typescript@5.5.4)(utf-8-validate@5.0.10)':
     dependencies:
       '@solana-program/system': 0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.5.4)(utf-8-validate@5.0.10))
@@ -11852,7 +11857,7 @@ snapshots:
       '@typescript-eslint/parser': 8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4)
       eslint: 8.57.0(supports-color@10.2.2)
       eslint-import-resolver-node: 0.3.10(supports-color@10.2.2)
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2))(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.57.0(supports-color@10.2.2))
       eslint-plugin-react: 7.37.5(eslint@8.57.0(supports-color@10.2.2))
@@ -11872,7 +11877,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2))(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3(supports-color@10.2.2)
@@ -11910,7 +11915,7 @@ snapshots:
       '@typescript-eslint/parser': 8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4)
       eslint: 8.57.0(supports-color@10.2.2)
       eslint-import-resolver-node: 0.3.10(supports-color@10.2.2)
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.70.0(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.5.4))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2))(eslint@8.57.0(supports-color@10.2.2))(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -15257,6 +15262,23 @@ snapshots:
       workerd: 1.20260903.1
     optionalDependencies:
       '@cloudflare/workers-types': 4.20240925.0
+      fsevents: 2.3.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  wrangler@4.129.0(@cloudflare/workers-types@5.20260911.1)(bufferutil@4.1.0)(utf-8-validate@5.0.10):
+    dependencies:
+      '@cloudflare/kv-asset-handler': 0.5.0
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260903.1)
+      blake3-wasm: 2.1.5
+      esbuild: 0.28.1
+      miniflare: 5.20260903.0-alpha(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      path-to-regexp: 6.3.0
+      unenv: 2.0.0-rc.24
+      workerd: 1.20260903.1
+    optionalDependencies:
+      '@cloudflare/workers-types': 5.20260911.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - bufferutil

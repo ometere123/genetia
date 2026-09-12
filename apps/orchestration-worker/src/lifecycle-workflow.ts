@@ -1,4 +1,4 @@
-import { Workflow, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { expectedJobKey, validateQueueJob, type QueueJob } from "./queue-jobs";
 import { Pool } from "pg";
 import { createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
@@ -24,9 +24,9 @@ export interface LifecycleWorkflowEnv {
 
 /** Durable entry point. Each side effect belongs in a named step so a restart
  * resumes from the recorded step instead of replaying financial actions. */
-export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, QueueJob> {
-  async run(events: Array<WorkflowEvent<QueueJob>>, step: WorkflowStep): Promise<unknown> {
-    const payload = validateQueueJob(events.at(-1)?.payload);
+export class GenetiaLifecycleWorkflow extends WorkflowEntrypoint<LifecycleWorkflowEnv, QueueJob> {
+  async run(event: WorkflowEvent<QueueJob>, step: WorkflowStep): Promise<unknown> {
+    const payload = validateQueueJob(event.payload);
     const workflowKey = expectedJobKey(payload);
     const initial = await step.do(`durable:${workflowKey}`, async () => {
       if (!this.env.GENETIA_DB) throw new Error("Hyperdrive binding is required for lifecycle persistence");

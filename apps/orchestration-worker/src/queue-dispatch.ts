@@ -1,7 +1,7 @@
 import { validateQueueJob, type QueueJob } from "./queue-jobs";
 
 export interface WorkflowStarter {
-  create(id: string, params: QueueJob): Promise<unknown>;
+  create(options: { id: string; params: QueueJob }): Promise<unknown>;
 }
 
 export function workflowId(job: QueueJob): string {
@@ -12,7 +12,7 @@ export async function dispatchQueueJob(job: unknown, env: { GENETIA_WORKFLOWS: W
   const parsed = validateQueueJob(job);
   const id = workflowId(parsed);
   try {
-    await env.GENETIA_WORKFLOWS.create(id, parsed);
+    await env.GENETIA_WORKFLOWS.create({ id, params: parsed });
   } catch (error) {
     // Workflow creation is the idempotent boundary. A retry after the first
     // consumer created the instance is already complete; only infrastructure

@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Theme tokens
+   ────────────────────────────────────────────────────────────────────────────
+   Surface, border, and body colors live as CSS variables so the same
+   Tailwind class names (bg-surface-1, border-border, etc.) resolve to the
+   right palette based on the `dark` / `light` class on <html>.
+
+   Tailwind's slate scale is built-in and can't be redefined, so we
+   override the slate text/bg utilities for `.light` further down.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Dark — the original look. Also the default before JS hydrates. */
+:root,
+.dark {
+  color-scheme: dark;
+
+  --surface-0: 10 11 15;
+  --surface-1: 17 19 24;
+  --surface-2: 24 27 34;
+  --surface-3: 30 34 41;
+  --surface-4: 37 42 51;
+
+  --border:        30 34 41;
+  --border-strong: 45 55 72;
+
+  --bg-app: rgb(var(--surface-0));
+  --fg-app: #f1f5f9;
+
+  --scrollbar-thumb: #2d3748;
+  --scrollbar-thumb-hover: #4a5568;
+}
+
+/* Light — high-contrast neutrals. */
+.light {
+  color-scheme: light;
+
+  --surface-0: 248 250 252;   /* slate-50  — app bg */
+  --surface-1: 255 255 255;   /* white      — main card */
+  --surface-2: 241 245 249;   /* slate-100 — inset / table rows */
+  --surface-3: 226 232 240;   /* slate-200 — hover / chip */
+  --surface-4: 203 213 225;   /* slate-300 — keyboard / divider strong */
+
+  --border:        226 232 240;  /* slate-200 */
+  --border-strong: 203 213 225;  /* slate-300 */
+
+  --bg-app: rgb(var(--surface-0));
+  --fg-app: #0f172a; /* slate-900 */
+
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg-app);
+  color: var(--fg-app);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Slate scale inversion for light mode
+   ───────────────────────────────────────────────────────────────────────────
+   The app uses text-slate-100 → text-slate-700 everywhere as a "white at
+   the top, grey at the bottom" hierarchy. In light mode we invert that
+   so text-slate-100 (the most prominent) becomes the darkest, etc.
+   ─────────────────────────────────────────────────────────────────────── */
+
+.light .text-slate-50  { color: #0f172a; }   /* slate-900 */
+.light .text-slate-100 { color: #0f172a; }   /* slate-900 */
+.light .text-slate-200 { color: #1e293b; }   /* slate-800 */
+.light .text-slate-300 { color: #334155; }   /* slate-700 */
+.light .text-slate-400 { color: #475569; }   /* slate-600 */
+.light .text-slate-500 { color: #64748b; }   /* slate-500 unchanged */
+.light .text-slate-600 { color: #94a3b8; }   /* slate-400 */
+.light .text-slate-700 { color: #cbd5e1; }   /* slate-300 */
+
+/* Background variants of the same scale, used much less but still present. */
+.light .bg-slate-50  { background-color: #f8fafc; }
+.light .bg-slate-100 { background-color: #f1f5f9; }
+.light .bg-slate-200 { background-color: #e2e8f0; }
+.light .bg-slate-300 { background-color: #cbd5e1; }
+
+/* Pure-white text in dark mode should become near-black in light mode. */
+.light .text-white { color: #0f172a; }
+
+/* Brand-light tinted text needs a touch more contrast on white backgrounds. */
+.light .text-brand-light { color: #4f46e5; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Scrollbar — theme-aware
+   ─────────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Probability bar gradient — colour-blind safe in both themes. */
+.prob-bar-yes { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.prob-bar-no  { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+/* Glassmorphism card — invert tint in light mode for visibility. */
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.light .glass {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+/* Live-pulse animation. */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.live-dot { animation: live-pulse 1.5s ease-in-out infinite; }

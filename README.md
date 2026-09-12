@@ -1,30 +1,197 @@
 # Genetia
 
-Genetia is a gas-abstracted prediction-market protocol for broad YES/NO questions. Base Sepolia (chain 84532) is the financial network; GenLayer Studio Dev (chain 61997) is the resolution layer. Every activated market is bound to an immutable resolution manifest and an immutable contract release.
+Genetia is an Arc-native prediction market using LMSR-based trading and GenLayer AI-powered outcome resolution.
 
-## Architecture
+Core positioning:
 
-- Base contracts: `contracts/base` — Pool, Live Price/LMSR, vaults, risk caps, fees, immutable release registry, and resolution transport.
-- GenLayer Intelligent Contracts: `contracts/genlayer` — `MarketAdmissibility`, `ResolverFactory`, and immutable per-market `MarketResolver`.
-- Cloudflare: `apps/api-worker`, orchestration, queues, workflows, cron, Hyperdrive, and five independently keyed watcher deployments.
-- Supabase Postgres: indexed/application data only; Base and GenLayer remain authoritative.
-- Frontend target: Vercel with Privy user-owned wallets, wagmi/viem, and no custodial betting balance.
+> Arc handles the financial market layer. GenLayer handles intelligent evidence-based outcome resolution.
 
-## Locked economic constants
+This is testnet MVP software. It is not audited, not legal or financial advice, and not yet decentralised end to end.
 
-Pool fee is 1.50% (10% creator / 90% Genetia), with no fee on VOID. LMSR trading fee is 1.00% (50% LP vault / 10% creator / 40% Genetia), with no terminal redemption fee. LMSR `b` is 100–5,000 USDC and funding is `max(100 USDC, ceil(1.10 × b × ln(2)))`. Market and system exposure caps are 25,000 and 250,000 USDC. There is no fixed wager or LP contribution minimum; the separate proposal bond is 2 USDC.
+## Architecture Overview
 
-## Development
+- Arc contracts: settle trading, collateral, challenge windows, finalisation, and redemption.
+- Outcome tokens: ERC-1155 YES/NO position tokens per market.
+- LMSR market maker: prices YES/NO shares with Hanson's LMSR curve and USDC collateral.
+- Circle/Arc wallet layer: each user gets a Circle Developer-Controlled SCA wallet on Arc Testnet.
+- GenLayer resolver: fetches evidence and produces the market verdict.
+- Resolver pipeline: trusted app/relayer path that validates GenLayer verdicts and submits them to Arc.
+- Frontend: Next.js market UI, trading panel, wallet flows, admin tools, and transparency disclosures.
+
+## Text Diagram
 
 ```text
-pnpm install --frozen-lockfile
-pnpm --filter @genetia/api-worker typecheck
-pnpm --filter @genetia/resolution-watcher typecheck
-cd contracts/base && forge build && forge test
+User
+  |
+  v
+Frontend / Next.js app
+  |
+  v
+Arc LMSRMarket.sol <-> OutcomeTokens.sol
+  ^
+  |
+Resolver pipeline / trusted relayer
+  ^
+  |
+GenLayer market_resolver.py
+  ^
+  |
+Evidence sources
 ```
 
-Deployment manifests are under `deployments/`. They intentionally contain null/not-deployed values until real credentials and verified transactions exist. Never use fake transaction hashes or deploy dirty code.
+## Current Trust Model
 
-## Security boundary
+- Arc contracts handle market trading, collateral, finalisation, and redemption.
+- GenLayer generates evidence-based YES/NO verdicts.
+- A trusted relayer/app pipeline submits validated GenLayer verdicts to Arc.
+- A 24 hour challenge window starts after the relayer proposes the verdict.
+- If challenged, admin adjudication is required in this MVP.
+- Admin functions exist for testnet safety and operational recovery.
+- Multisig dispute governance is intentionally not included yet.
+- Compliance checks are app-level MVP controls unless a contract explicitly enforces them.
 
-No staff operation can choose an outcome. A Base market accepts only a verified 3-of-5 watcher envelope for a finalized, successful GenLayer execution, or permissionless `expireToVoid()` after its absolute terminal deadline. Exits remain callable through normal pause/cap states and old immutable releases are never forcibly migrated.
+## Market Lifecycle
+
+1. Admin creates or approves a market.
+2. The app mirrors it to Arc through `LMSRMarketFactory`.
+3. Users trade YES/NO through Circle SCA wallets.
+4. At expiry, the resolver pipeline submits the question, criteria, and evidence sources to GenLayer.
+5. GenLayer returns an evidence-based verdict.
+6. The resolver pipeline validates the verdict and creates a resolver attestation.
+7. The trusted relayer calls `proposeResolution(outcome)` on Arc.
+8. The market enters the challenge window.
+9. If unchallenged, anyone can finalise after the window.
+10. If challenged, admin adjudication resolves the MVP dispute.
+11. Users redeem outcome tokens on Arc.
+
+## Important Files
+
+```text
+contracts/arc/src/lmsr/LMSRMarket.sol
+contracts/arc/src/lmsr/LMSRMarketFactory.sol
+contracts/arc/src/lmsr/OutcomeTokens.sol
+contracts/genlayer/market_resolver.py
+frontend/src/lib/resolver-pipeline.ts
+frontend/src/lib/market-policy.ts
+frontend/src/lib/circle.ts
+frontend/src/lib/arc-userops.ts
+frontend/src/lib/arc-indexer.ts
+frontend/src/app/markets/[id]/page.tsx
+relayer/src/index.ts
+```
+
+## Environment Variables
+
+Start from `.env.example`. Do not commit real secrets.
+
+Arc:
+
+```env
+NEXT_PUBLIC_ARC_CHAIN_ID=5042002
+NEXT_PUBLIC_ARC_RPC_URL=https://rpc.testnet.arc.network
+NEXT_PUBLIC_ARC_EXPLORER_URL=https://testnet.arcscan.app
+NEXT_PUBLIC_ARC_USDC_ADDRESS=0x3600000000000000000000000000000000000000
+NEXT_PUBLIC_LMSR_FACTORY_ADDRESS=
+NEXT_PUBLIC_OUTCOME_TOKENS_ADDRESS=
+ARC_ADMIN_PRIVATE_KEY=
+ARC_RESOLVER_PRIVATE_KEY=
+ARC_OPERATOR_PRIVATE_KEY=
+```
+
+GenLayer:
+
+```env
+GENLAYER_RPC=https://studio.genlayer.com/api
+GENLAYER_CHAIN_ID=61999
+GENLAYER_CONTRACT_ADDRESS=0x7DE5e141bCD9c8c7f7Ab40396FF517859ec80172
+NEXT_PUBLIC_GENLAYER_RESOLVER_ADDRESS=0x7DE5e141bCD9c8c7f7Ab40396FF517859ec80172
+GENLAYER_RELAYER_PRIVATE_KEY=
+```
+
+Circle and Privy:
+
+```env
+CIRCLE_API_KEY=
+CIRCLE_ENTITY_SECRET=
+CIRCLE_WALLET_SET_ID=
+CIRCLE_BLOCKCHAIN=ARC-TESTNET
+CIRCLE_ACCOUNT_TYPE=SCA
+PRIVY_APP_ID=
+PRIVY_APP_SECRET=
+NEXT_PUBLIC_PRIVY_APP_ID=
+```
+
+App and cron:
+
+```env
+DATABASE_URL=
+DIRECT_URL=
+APP_URL=http://localhost:3000
+CRON_SECRET=
+POLL_INTERVAL_MS=60000
+INDEX_INTERVAL_MS=30000
+ADMIN_WALLET_ADDRESS=
+NEXT_PUBLIC_ADMIN_ADDRESS=
+NEXT_PUBLIC_ADMIN_SLUG=/admin
+NEXT_PUBLIC_MIN_TRADE_USDC=0.01
+NEXT_PUBLIC_MAX_TRADE_USDC=5000
+```
+
+## Local Development
+
+Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+npm run db:generate
+npm run dev
+```
+
+Run the cron pinger:
+
+```bash
+cd relayer
+npm install
+npm run dev
+```
+
+Compile and test Arc contracts:
+
+```bash
+cd contracts/arc
+forge build
+forge test -vvv
+```
+
+Build checks:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+
+cd ../relayer
+npm run build
+```
+
+## Known Limitations
+
+- The GenLayer-to-Arc bridge is trusted through the app/relayer.
+- Challenged markets use admin adjudication.
+- Dispute multisig/governance is not implemented yet.
+- Compliance checks are MVP app-level controls unless a contract enforces them.
+- Arc and GenLayer usage is testnet-oriented.
+- The contracts are not production audited.
+- The frontend relies on the Arc indexer cache for fast market reads.
+
+## Roadmap
+
+- Multisig or governance dispute module.
+- Decentralised relayer set.
+- Stronger indexer backfill and monitoring.
+- Richer compliance and market policy engine.
+- Independent resolver committees.
+- Full smart contract and backend audit.
+- Multi-stablecoin settlement if supported by Arc/Circle.
+- Improved market creation templates and evidence standards.

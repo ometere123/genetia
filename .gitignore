@@ -10,39 +10,23 @@
 !**/.env.example
 !**/.env.local.example
 
-.dev.vars
-*.dev.vars
-
 # ── Node ──────────────────────────────────────────────────────────────────────
 node_modules/
-.venv/
-.pytest_cache/
-__pycache__/
-*.py[cod]
-artifacts/
-.pnpm-store/
-.corepack/
-.turbo/
-**/.wrangler/
-**/dist/
-apps/api-worker/build/
-apps/orchestration-worker/build/
-workers/resolution-watcher/build/
 npm-debug.log*
 yarn-error.log*
 
 # ── Next.js ───────────────────────────────────────────────────────────────────
-apps/web/.next/
-apps/web/out/
-apps/web/test-results/
+frontend/.next/
+frontend/out/
 *.tsbuildinfo
 
 # ── Foundry / Solidity ────────────────────────────────────────────────────────
-contracts/base/out/
-contracts/base/cache/
-contracts/base/broadcast/
+contracts/arc/out/
+contracts/arc/cache/
+contracts/arc/broadcast/
 
 # ── Relayer build ─────────────────────────────────────────────────────────────
+relayer/dist/
 
 # ── Claude Code ───────────────────────────────────────────────────────────────
 .claude/

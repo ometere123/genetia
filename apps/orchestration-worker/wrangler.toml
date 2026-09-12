@@ -3,6 +3,10 @@ main = "build/worker.js"
 compatibility_date = "2026-09-04"
 compatibility_flags = ["nodejs_compat"]
 
+[vars]
+GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
+MARKET_ADMISSIBILITY_ADDRESS = "0x2C0d57182cb4860AC03252181e5a908747111A36"
+
 [[queues.producers]]
 binding = "GENETIA_JOBS"
 queue = "genetia-work-items"

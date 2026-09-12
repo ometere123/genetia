@@ -30,11 +30,11 @@ export async function persistVerifiedProposal(
       return { proposalId: String(existing.rows[0].proposalId ?? proposalId), duplicate: true };
     }
     await client.query(
-      `INSERT INTO "genetia_app"."Proposal" ("proposerUserId", "proposalId", "proposalKey", "canonicalTerms", "bondTxHash", "bondAmount", "canonicalProposalHash", "bondStatus", "admissibilityOperationId", "workflowStatus") VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'CONFIRMED', $8, 'BOND_CONFIRMED')`,
+      `INSERT INTO "genetia_app"."Proposal" ("proposerUserId", "proposalId", "proposalKey", "canonicalTerms", "bondTxHash", "bondAmount", "canonicalProposalHash", "bondStatus", "admissibilityOperationId", "workflowStatus", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'CONFIRMED', $8, 'BOND_CONFIRMED', now(), now())`,
       [user.rows[0].id, proposalId, input.proposal.idempotencyKey, JSON.stringify(input.proposal), input.bondTxHash, "2000000", canonicalHash, `admissibility:${proposalId}`],
     );
     await client.query(
-      `INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey", "workflowType", "externalId", "state", "payload") VALUES ($1, 'MARKET_ADMISSIBILITY', $2, 'PENDING', $3::jsonb) ON CONFLICT ("idempotencyKey") DO NOTHING`,
+      `INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey", "workflowType", "externalId", "state", "payload", "createdAt", "updatedAt") VALUES ($1, 'MARKET_ADMISSIBILITY', $2, 'PENDING', $3::jsonb, now(), now()) ON CONFLICT ("idempotencyKey") DO NOTHING`,
       [`admissibility:${proposalId}`, proposalId, JSON.stringify({ proposalId, proposer: input.proposer })],
     );
     await client.query("COMMIT");

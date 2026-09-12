@@ -35,8 +35,8 @@ export class GenetiaLifecycleWorkflow extends WorkflowEntrypoint<LifecycleWorkfl
         // Workflow delivery is at-least-once. The primary key makes replay,
         // queue redelivery, and workflow restarts converge on one operation.
         await pool.query(
-          `INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey", "workflowType", "externalId", "state", "payload", "attempts")
-           VALUES ($1, $2, $3, 'RUNNING', $4::jsonb, 1)
+          `INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey", "workflowType", "externalId", "state", "payload", "attempts", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, 'RUNNING', $4::jsonb, 1, now(), now())
            ON CONFLICT ("idempotencyKey") DO UPDATE SET
              "attempts" = "genetia_app"."WorkflowState"."attempts" + 1,
              "state" = CASE WHEN "genetia_app"."WorkflowState"."state" IN ('COMPLETE','FAILED') THEN "genetia_app"."WorkflowState"."state" ELSE 'RUNNING' END,
@@ -98,7 +98,7 @@ export class GenetiaLifecycleWorkflow extends WorkflowEntrypoint<LifecycleWorkfl
               return { ...value, ...body, lifecycle: String(existing.rows[0].state ?? body.lifecycle ?? "READY") as never, txId: existing.rows[0].externalId ? String(existing.rows[0].externalId) as never : undefined };
             }
             const durableValue = { ...value, startedAt: new Date().toISOString() };
-            await pool.query(`INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey","workflowType","externalId","state","payload") VALUES ($1,'MARKET_ADMISSIBILITY',$2,'READY',$3::jsonb) ON CONFLICT DO NOTHING`, [value.operationId, value.proposalId, JSON.stringify(durableValue)]);
+            await pool.query(`INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey","workflowType","externalId","state","payload","createdAt","updatedAt") VALUES ($1,'MARKET_ADMISSIBILITY',$2,'READY',$3::jsonb,now(),now()) ON CONFLICT DO NOTHING`, [value.operationId, value.proposalId, JSON.stringify(durableValue)]);
             const inserted = await pool.query(`SELECT "state","externalId","payload" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey"=$1`, [value.operationId]);
             const body = (inserted.rows[0]?.payload ?? durableValue) as Record<string, unknown>;
             return { ...value, ...body, lifecycle: String(inserted.rows[0]?.state ?? "READY") as never };

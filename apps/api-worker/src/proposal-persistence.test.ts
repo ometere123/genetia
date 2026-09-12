@@ -25,6 +25,7 @@ describe("durable verified proposal persistence", () => {
     const result = await persistVerifiedProposal(client, { proposal, proposer, bondTxHash: `0x${"22".repeat(32)}`, receipt: { status: "success", to: proposer, logs: [] } });
     expect(result.duplicate).toBe(false); expect(calls[0]).toBe("BEGIN"); expect(calls.at(-1)).toBe("COMMIT");
     expect(calls.some((sql) => sql.includes('"genetia_app"."WorkflowState"'))).toBe(true);
+    expect(calls.some((sql) => sql.includes('"createdAt", "updatedAt"') && sql.includes('now(), now()'))).toBe(true);
   });
 
   it("rolls back when the proposer wallet is absent", async () => {

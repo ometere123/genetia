@@ -1,0 +1,169 @@
+{
+  "network": "studio-dev",
+  "chainId": 61997,
+  "marketId": "0x9efed27d8f60acf0cb00af167f0fccd764e3c1c5edc0269ac7badaa1a6dea57f",
+  "proposalId": "connected-pool-9efed27d8f60acf0",
+  "manifestHash": "0xbaeb2da9823186f539eb4220696711cd1b928c8dde8fa84e5b99b446c99b5323",
+  "assessmentStatus": "FINALIZED_SUCCESS",
+  "updatedAt": "2026-09-12T04:18:11.539Z",
+  "assessmentTx": "0x90576930c03ae02d71061b2f4e4a91c90b20cfe21bbda5c31ac7a7cbc8db55f6",
+  "lastObservedStatus": "FINALIZED",
+  "lastObservedExecution": "FINISHED_WITH_ERROR",
+  "assessmentExecution": "FINISHED_WITH_RETURN",
+  "assessmentReturnVerification": "SDK transaction endpoint does not expose method return; verified deployed source returns the same decision variable stored in LATEST_FINAL state",
+  "assessment": {
+    "decision": "APPROVED",
+    "issue_codes": []
+  },
+  "finalizedAssessmentState": "LATEST_FINAL",
+  "resolverFactoryTxStatus": "FINALIZED_SUCCESS",
+  "factoryFeeEstimateMode": "network-estimate-after-child-simulation-exit",
+  "resolverFactorySubmittedAt": "2026-09-12T04:15:00.788Z",
+  "resolverFactoryAddress": "0x21e729aD74893bEa2f20451650235466bDEb9520",
+  "factoryAttempts": [
+    {
+      "factoryAddress": "previous-release",
+      "tx": "0x7e0859061efc044f0c82b580847317be4322c58fa830d18fece9938b193e8e0a",
+      "status": "FAILED_OR_SUPERSEDED"
+    },
+    {
+      "factoryAddress": "0x32C109307BF98d2B236c1fa968604Bb0E50f36f7",
+      "tx": "0xd13ec3ab444f0cd39b37dc18d416d572f088b0560be47a848c5815eb0ccfb567",
+      "status": "FAILED_OR_SUPERSEDED"
+    },
+    {
+      "factoryAddress": "0x57382468AEff6C4312978A84687E283f9d219E31",
+      "tx": "0x6cc537770ba227624295671a11b77b8fdc59f77a7157c901a3966abad698d44e",
+      "status": "FAILED_OR_SUPERSEDED"
+    },
+    {
+      "factoryAddress": "0xD7670448EC4739053Ce1413B068C10f8a9Fd4Db2",
+      "tx": "0xb5a00bd08d81d1d275c1815fc789a78e5751f36e8ab7ffa997d748b84612bcd4",
+      "status": "FAILED_OR_SUPERSEDED"
+    },
+    {
+      "factoryAddress": "0xdc85aFfa128D285894Fc191f04c495BD6C88042B",
+      "tx": "0xe34264f9a0b79e9cdab5cb6c77f2fb9cf152475e4a0bf41fde90cd83477ec161",
+      "status": "FAILED_OR_SUPERSEDED"
+    }
+  ],
+  "assessmentLastObservedStatus": "FINALIZED",
+  "assessmentLastObservedExecution": "FINISHED_WITH_RETURN",
+  "factoryLastObservedStatus": "FINALIZED",
+  "factoryLastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolverFactoryExecution": "FINISHED_WITH_RETURN",
+  "triggeredTxs": [
+    "0xd8795db8ffe07f627e2e0bc9cd24fec141d2a472c98fd423a3a78f89e495d464"
+  ],
+  "child-7cbd7986LastObservedStatus": "FINALIZED",
+  "child-7cbd7986LastObservedExecution": "FINISHED_WITH_RETURN",
+  "childFinality": [
+    {
+      "tx": "0x7cbd7986fa5e3ad3868a5fb9164b015d8e4a17258c2d6e1788c0d082e183698b",
+      "status": "FINALIZED",
+      "execution": "FINISHED_WITH_RETURN"
+    }
+  ],
+  "resolverAddress": "0x462b67969eb838f641234FcDE64e4cAE0b35e193",
+  "resolverSourceSha256": "27ad6811b1e2d8b711844523d44065132693d0a5c32befaed51700b17d95a563",
+  "intendedResolverSha256": "27ad6811b1e2d8b711844523d44065132693d0a5c32befaed51700b17d95a563",
+  "resolverCodeMatches": true,
+  "resolverSchema": {
+    "ctor": {
+      "params": [
+        [
+          "locked_manifest",
+          "string"
+        ],
+        [
+          "locked_hash",
+          "string"
+        ],
+        [
+          "release_id",
+          "string"
+        ]
+      ],
+      "kwparams": {}
+    },
+    "methods": {
+      "get_attempt": {
+        "params": [
+          [
+            "attempt_number",
+            "int"
+          ]
+        ],
+        "kwparams": {},
+        "readonly": true,
+        "ret": "string"
+      },
+      "get_binding_state": {
+        "params": [],
+        "kwparams": {},
+        "readonly": true,
+        "ret": "string"
+      },
+      "resolve": {
+        "params": [
+          [
+            "market_id",
+            "string"
+          ],
+          [
+            "attempt_number",
+            "int"
+          ]
+        ],
+        "kwparams": {},
+        "readonly": false,
+        "ret": "string",
+        "payable": false
+      }
+    }
+  },
+  "binding": {
+    "base_market": "0x7d6652Eca0245e8749Ef46D763b1A9481dDa9aCa",
+    "last_result": "UNRESOLVED",
+    "manifest_hash": "0xbaeb2da9823186f539eb4220696711cd1b928c8dde8fa84e5b99b446c99b5323",
+    "market_id": "0x9efed27d8f60acf0cb00af167f0fccd764e3c1c5edc0269ac7badaa1a6dea57f",
+    "resolver_release_id": "0x898e942c79a4f9dcd5f0ad4274dc3001adccc339af7d6beaad90e20e0d8b5b57",
+    "status": "REGISTERED"
+  },
+  "resolverStatus": "VERIFYING_FINALIZED_BINDING",
+  "resolveStatus": "FINALIZED_SUCCESS",
+  "resolveAttempt": 0,
+  "resolveFeeEstimateMode": "network-estimate-after-stale-simulation-clock",
+  "resolveTx": "0x948c050db41efb4d211d8b30060cabe0ceaafca7a0650028494e8268ff7b352a",
+  "resolveSubmittedAt": "2026-09-12T02:58:59.390Z",
+  "resolveLastObservedStatus": "FINALIZED",
+  "resolveLastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolveExecution": "FINISHED_WITH_RETURN",
+  "attemptRecord": {
+    "attempt": 0,
+    "evidence_commitment": "0x4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "facts": [],
+    "manifest_hash": "0xbaeb2da9823186f539eb4220696711cd1b928c8dde8fa84e5b99b446c99b5323",
+    "outcome": "UNRESOLVED",
+    "result_commitment": "0x0c91a652a447cf2cc34b2794e59a1207e93b2701b1396148ad9dac2b2106ea24",
+    "used_sources": []
+  },
+  "resultCommitment": "0x0c91a652a447cf2cc34b2794e59a1207e93b2701b1396148ad9dac2b2106ea24",
+  "resolverFactoryTx": "0x26d0f44a1768aa83508ff204f786a231b2ccbdc579d73454a9c4c12cbf2c37e7",
+  "child-d8795db8LastObservedStatus": "FINALIZED",
+  "child-d8795db8LastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolverBindingMismatch": {
+    "marketIdMatches": true,
+    "baseMarketMatches": true,
+    "manifestHashMatches": true,
+    "resolverReleaseMatches": false,
+    "binding": {
+      "base_market": "0x7d6652Eca0245e8749Ef46D763b1A9481dDa9aCa",
+      "last_result": "UNRESOLVED",
+      "manifest_hash": "0xbaeb2da9823186f539eb4220696711cd1b928c8dde8fa84e5b99b446c99b5323",
+      "market_id": "0x9efed27d8f60acf0cb00af167f0fccd764e3c1c5edc0269ac7badaa1a6dea57f",
+      "resolver_release_id": "0x891034a5773f6dcad070f14a82ed741d982e2ff1b8dd8458c601aaf18049a481",
+      "status": "REGISTERED"
+    }
+  }
+}

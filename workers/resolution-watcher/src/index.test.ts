@@ -1,8 +1,9 @@
 import { abi as genlayerAbi } from "genlayer-js";
+import { readFileSync } from "node:fs";
 import type { GenLayerTransaction } from "genlayer-js/types";
 import { bytesToHex, type Hex } from "viem";
-import { beforeAll, describe, expect, it } from "vitest";
-import { assertWatcherEligible, canonicalEvidenceCommitment, canonicalResolverResultCommitment, stableEvidenceJson, type FinalizedResolverState, type ResolutionEnvelope } from "./index";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { assertWatcherEligible, attestWithClient, canonicalEvidenceCommitment, canonicalResolverResultCommitment, canonicalResolverResultJson, stableEvidenceJson, type FinalizedResolverState, type ResolutionEnvelope } from "./index";
 
 const txId = `0x${"11".repeat(32)}` as Hex;
 const resolver = `0x${"22".repeat(20)}` as Hex;
@@ -22,26 +23,24 @@ const finalized = {
   txId, recipient: resolver, lifecycle: { state: "finalized", outcome: "accepted" },
   status: 7, statusName: "FINALIZED", txExecutionResult: 1,
   txExecutionResultName: "FINISHED_WITH_RETURN",
+  data: { calldata: { raw: Array.from(genlayerAbi.calldata.encode(genlayerAbi.calldata.makeCalldataObject("resolve", [finalizedState.marketId, 0], {}))) } },
 } as GenLayerTransaction;
-const trace = { result_code: 1, return_data: returnData, stderr: "", finalizedState };
 
 describe("watcher finality gate", () => {
   beforeAll(async () => { const evidenceCommitment = await canonicalEvidenceCommitment(finalizedState); finalizedState.resolverResultCommitment = await canonicalResolverResultCommitment(finalizedState, envelopeBase.baseMarket); envelope = { ...envelopeBase, evidenceCommitment, resultCommitment: finalizedState.resolverResultCommitment }; });
-  it("accepts only finalized successful execution", async () => await expect(assertWatcherEligible(finalized, trace, envelope)).resolves.toBeUndefined());
+  it("accepts only finalized successful execution with decoded resolve arguments", async () => await expect(assertWatcherEligible(finalized, finalizedState, envelope)).resolves.toBeUndefined());
   it.each(["processing", "decided"])("rejects %s lifecycle", async (state) => {
     const tx = { ...finalized, lifecycle: state === "processing" ? { state, phase: "pending" } : { state, outcome: "accepted" } } as GenLayerTransaction;
-    await expect(assertWatcherEligible(tx, trace, envelope)).rejects.toThrow("not finalized");
+    await expect(assertWatcherEligible(tx, finalizedState, envelope)).rejects.toThrow("not finalized");
   });
   it("rejects finalized failed execution", async () => {
     const tx = { ...finalized, txExecutionResult: 2, txExecutionResultName: "FINISHED_WITH_ERROR" } as GenLayerTransaction;
-    await expect(assertWatcherEligible(tx, trace, envelope)).rejects.toThrow("not successful");
+    await expect(assertWatcherEligible(tx, finalizedState, envelope)).rejects.toThrow("not successful");
   });
-  it("rejects wrong resolver", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, resolver: `0x${"88".repeat(20)}` })).rejects.toThrow("wrong resolver"));
-  it("rejects wrong transaction", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, genlayerTxId: `0x${"99".repeat(32)}` })).rejects.toThrow("wrong transaction"));
-  it("rejects altered outcome", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, outcome: 1 })).rejects.toThrow("altered outcome"));
-  it("rejects failed trace", async () => await expect(assertWatcherEligible(finalized, { ...trace, result_code: 2 }, envelope)).rejects.toThrow("trace was not successful"));
-  it("rejects wrong commitment", async () => await expect(assertWatcherEligible(finalized, trace, { ...envelope, resultCommitment: `0x${"aa".repeat(32)}` })).rejects.toThrow("wrong result commitment"));
-  it("rejects a trace-only commitment without finalized resolver state", async () => await expect(assertWatcherEligible(finalized, { result_code: 1, return_data: returnData, stderr: "" }, envelope)).rejects.toThrow("finalized resolver state is required"));
+  it("rejects wrong resolver", async () => await expect(assertWatcherEligible(finalized, finalizedState, { ...envelope, resolver: `0x${"88".repeat(20)}` })).rejects.toThrow("wrong resolver"));
+  it("rejects wrong transaction", async () => await expect(assertWatcherEligible(finalized, finalizedState, { ...envelope, genlayerTxId: `0x${"99".repeat(32)}` })).rejects.toThrow("wrong transaction"));
+  it("rejects altered outcome", async () => await expect(assertWatcherEligible(finalized, finalizedState, { ...envelope, outcome: 1 })).rejects.toThrow("wrong resolver result"));
+  it("rejects wrong commitment", async () => await expect(assertWatcherEligible(finalized, finalizedState, { ...envelope, resultCommitment: `0x${"aa".repeat(32)}` })).rejects.toThrow("wrong result commitment"));
   it.each([
     ["marketId", { marketId: `0x${"aa".repeat(32)}` }],
     ["baseMarket", { baseMarket: `0x${"aa".repeat(20)}` }],
@@ -56,15 +55,47 @@ describe("watcher finality gate", () => {
     ["evidenceCommitment", { evidenceCommitment: `0x${"aa".repeat(32)}` }],
     ["resultCommitment", { resultCommitment: `0x${"aa".repeat(32)}` }],
   ])("rejects mutation of signed %s field", async (_field, mutation) => {
-    await expect(assertWatcherEligible(finalized, trace, { ...envelope, ...mutation } as ResolutionEnvelope)).rejects.toThrow();
+    await expect(assertWatcherEligible(finalized, finalizedState, { ...envelope, ...mutation } as ResolutionEnvelope)).rejects.toThrow();
+  });
+});
+
+describe("production attest state acquisition", () => {
+  it("reads finalized binding and attempt state instead of trusting trace or caller state", async () => {
+    const readContract = vi.fn(async ({ functionName }: Record<string, unknown>) => {
+      if (functionName === "get_binding_state") return JSON.stringify({ market_id: finalizedState.marketId, base_market: finalizedState.baseMarket, manifest_hash: finalizedState.manifestHash, resolver_release_id: finalizedState.resolverReleaseId, status: "RESOLVED" });
+      if (functionName === "get_attempt") return JSON.stringify({ attempt: finalizedState.attempt, outcome: finalizedState.outcome, evidence: finalizedState.evidence.map((item) => ({ identity: item.identity, url: item.url, content_hash: item.contentHash.slice(2) })), evidence_commitment: envelope.evidenceCommitment, result_commitment: finalizedState.resolverResultCommitment });
+      throw new Error("unexpected resolver method");
+    });
+    const client = {
+      getTransaction: vi.fn(async () => finalized),
+      readContract,
+    };
+    const result = await attestWithClient(envelope, { WATCHER_ID: "watcher-test", WATCHER_PRIVATE_KEY: `0x${"aa".repeat(32)}` as Hex, GENLAYER_RPC: "https://studio-dev.genlayer.com/api" }, client);
+    expect(result.signature).toMatch(/^0x[0-9a-f]+$/i);
+    expect(client.getTransaction).toHaveBeenCalledWith({ hash: txId });
+    expect(readContract).toHaveBeenCalledTimes(2);
+    expect(readContract.mock.calls.map(([call]) => call.functionName)).toEqual(["get_binding_state", "get_attempt"]);
+    expect(readContract.mock.calls.every(([call]) => call.transactionHashVariant === "latest-final")).toBe(true);
+  });
+
+  it("rejects when finalized resolver state contradicts the caller envelope", async () => {
+    const client = {
+      getTransaction: vi.fn(async () => finalized),
+      readContract: vi.fn(async ({ functionName }: Record<string, unknown>) => functionName === "get_binding_state"
+        ? JSON.stringify({ market_id: finalizedState.marketId, base_market: `0x${"99".repeat(20)}`, manifest_hash: finalizedState.manifestHash, resolver_release_id: finalizedState.resolverReleaseId, status: "RESOLVED" })
+        : JSON.stringify({ attempt: 0, outcome: "YES", evidence: [], evidence_commitment: envelope.evidenceCommitment, result_commitment: envelope.resultCommitment })),
+    };
+    await expect(attestWithClient(envelope, { WATCHER_ID: "watcher-test", WATCHER_PRIVATE_KEY: `0x${"aa".repeat(32)}` as Hex, GENLAYER_RPC: "https://studio-dev.genlayer.com/api" }, client)).rejects.toThrow("wrong base market state");
   });
 });
 
 describe("cross-language commitment vector", () => {
-  const state = { marketId: "market-42" as Hex, baseMarket: "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01" as Hex, manifestHash: "0xABCDEFabcdefABCDEFabcdefABCDEFabcdefABCDEFabcdefABCDEFabcdefABCD" as Hex, resolverReleaseId: "0xDeFabcDEFabcDEFabcDEFabcDEFabcDEFabcDEFabcDEFabcDEFabcDEFabcDEFab" as Hex, attempt: 3, outcome: "YES" as const, evidence: [{ identity: "source-a", url: "https://a.example/z", contentHash: "0xABCDEFabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefABCD" as Hex }, { identity: "source-a", url: "https://a.example/a", contentHash: "0x1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF" as Hex }], resolverResultCommitment: "0x00" as Hex, result: { terminal: true } };
+  const vector = JSON.parse(readFileSync(new URL("../../../contracts/genlayer/commitment_vector.json", import.meta.url), "utf8")) as Record<string, any>;
+  const state: FinalizedResolverState = { marketId: vector.market_id, baseMarket: vector.base_market, manifestHash: vector.manifest_hash, resolverReleaseId: vector.resolver_release_id, attempt: vector.attempt, outcome: vector.outcome, evidence: vector.evidence.map((item: { identity: string; url: string; content_hash: string }) => ({ identity: item.identity, url: item.url, contentHash: item.content_hash as Hex })), resolverResultCommitment: vector.result_commitment, result: { terminal: true } };
   it("matches the locked canonical evidence JSON and SHA-256", async () => {
-    expect(stableEvidenceJson(state)).toBe("[{\"content_hash\":\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\"identity\":\"source-a\",\"url\":\"https://a.example/a\"},{\"content_hash\":\"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\",\"identity\":\"source-a\",\"url\":\"https://a.example/z\"}]");
-    expect(await canonicalEvidenceCommitment(state)).toBe("0x8d4b401db887ec93ad8e96851f2f70313d8b3898b71ab3e063a605e767d0f8e6");
-    expect(await canonicalResolverResultCommitment(state, state.baseMarket)).toBe("0x721dc060e1df53b6ec9bd912cfeb82fe19123c61f77b79c8251d535441bbfe1e");
+    expect(stableEvidenceJson(state)).toBe(vector.canonical_evidence_json);
+    expect(await canonicalEvidenceCommitment(state)).toBe(vector.evidence_commitment);
+    expect(canonicalResolverResultJson({ ...state, resolverResultCommitment: vector.evidence_commitment }, state.baseMarket)).toBe(vector.canonical_result_json);
+    expect(await canonicalResolverResultCommitment(state, state.baseMarket)).toBe(vector.result_commitment);
   });
 });

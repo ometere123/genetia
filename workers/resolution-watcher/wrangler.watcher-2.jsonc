@@ -1,1 +1,1 @@
-{"name":"genetia-watcher-2","main":"src/index.ts","compatibility_date":"2026-09-05","compatibility_flags":["nodejs_compat"],"vars":{"WATCHER_ID":"watcher-2","GENLAYER_RPC":"https://studio-dev.genlayer.com/api"},"observability":{"enabled":true}}
+{"name":"genetia-watcher-2","main":"build/worker.js","compatibility_date":"2026-09-05","compatibility_flags":["nodejs_compat"],"vars":{"WATCHER_ID":"watcher-2","GENLAYER_RPC":"https://studio-dev.genlayer.com/api"},"observability":{"enabled":true}}

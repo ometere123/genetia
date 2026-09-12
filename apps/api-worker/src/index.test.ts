@@ -82,9 +82,19 @@ describe("canonical API contract", () => {
 
   it("serves proposal, positions, history, and health reads", async () => {
     await expect((await boundApp.request("http://localhost/api/market-proposals/p1", {}, boundEnv)).json()).resolves.toMatchObject({ id: "p1" });
-    await expect((await boundApp.request(`http://localhost/api/users/${market.creatorAddress}/positions`, {}, boundEnv)).json()).resolves.toEqual([{ marketId: "m1" }]);
-    await expect((await boundApp.request(`http://localhost/api/users/${market.creatorAddress}/history`, {}, boundEnv)).json()).resolves.toEqual([{ marketId: "m1" }]);
+    const authHeaders = { authorization: "Bearer test" };
+    await expect((await boundApp.request(`http://localhost/api/users/${market.creatorAddress}/positions`, { headers: authHeaders }, boundEnv)).json()).resolves.toEqual([{ marketId: "m1" }]);
+    await expect((await boundApp.request(`http://localhost/api/users/${market.creatorAddress}/history`, { headers: authHeaders }, boundEnv)).json()).resolves.toEqual([{ marketId: "m1" }]);
     await expect((await boundApp.request("http://localhost/api/health", {}, boundEnv)).json()).resolves.toMatchObject({ database: true });
+  });
+
+  it("protects wallet-specific position and history reads", async () => {
+    for (const collection of ["positions", "history"]) {
+      const url = `http://localhost/api/users/${market.creatorAddress}/${collection}`;
+      expect((await boundApp.request(url, {}, boundEnv)).status).toBe(401);
+      const authorized = await boundApp.request(url, { headers: { authorization: "Bearer test" } }, boundEnv);
+      expect(authorized.status).toBe(200);
+    }
   });
 
   it("validates quote payloads and serves a provider-backed quote", async () => {

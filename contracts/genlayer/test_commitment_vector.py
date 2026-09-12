@@ -19,6 +19,16 @@ def test_cross_language_commitment_vector():
     _evidence_commitment, _result_commitment = _commitment_functions()
     evidence = _evidence_commitment(vector["evidence"])
     assert evidence == vector["evidence_commitment"]
+    canonical_result = {
+        "attempt": vector["attempt"],
+        "base_market": vector["base_market"].lower(),
+        "evidence_commitment": evidence.lower(),
+        "manifest_hash": vector["manifest_hash"].lower(),
+        "market_id": vector["market_id"].lower(),
+        "outcome": vector["outcome"],
+        "resolver_release_id": vector["resolver_release_id"].lower(),
+    }
+    assert json.dumps(canonical_result, sort_keys=True, separators=(",", ":")) == vector["canonical_result_json"]
     result = _result_commitment(
         vector["market_id"], vector["base_market"], vector["manifest_hash"],
         vector["resolver_release_id"], vector["attempt"], vector["outcome"], evidence,

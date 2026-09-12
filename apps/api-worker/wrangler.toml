@@ -1,5 +1,5 @@
 name = "genetia-api"
-main = "src/index.ts"
+main = "build/worker.js"
 compatibility_date = "2026-09-04"
 compatibility_flags = ["nodejs_compat"]
 [vars]

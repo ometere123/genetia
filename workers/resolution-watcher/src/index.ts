@@ -1,7 +1,7 @@
 import { abi as genlayerAbi, createClient, isSuccessful } from "genlayer-js";
 import { studioDevnet } from "genlayer-js/chains";
 import { TransactionHashVariant, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
-import { hexToBytes, isAddress, type Address, type Hex } from "viem";
+import { isAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const STUDIO_DEV_RPC = "https://studio-dev.genlayer.com/api";
@@ -25,7 +25,8 @@ export type FinalizedResolverState = {
   resolverResultCommitment: Hex;
   result: { terminal: boolean; reason?: string };
 };
-export type Trace = { result_code: number; return_data: string; stderr: string; finalizedState?: FinalizedResolverState };
+type CallData = { base64?: string; raw?: number[] };
+type TransactionCallData = { calldata?: CallData };
 
 function parseState(bindingValue: unknown, attemptValue: unknown): FinalizedResolverState {
   const binding = JSON.parse(String(bindingValue));
@@ -50,38 +51,49 @@ export async function canonicalEvidenceCommitment(state: FinalizedResolverState)
   return `0x${Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as Hex;
 }
 
+export function canonicalResolverResultJson(state: FinalizedResolverState, baseMarket: Address): string {
+  return JSON.stringify({ attempt: state.attempt, base_market: baseMarket.toLowerCase(), evidence_commitment: state.resolverResultCommitment.toLowerCase(), manifest_hash: state.manifestHash.toLowerCase(), market_id: state.marketId.toLowerCase(), outcome: state.outcome, resolver_release_id: state.resolverReleaseId.toLowerCase() });
+}
+
 export async function canonicalResolverResultCommitment(state: FinalizedResolverState, baseMarket: Address): Promise<Hex> {
-  const preimage = JSON.stringify({ attempt: state.attempt, base_market: baseMarket.toLowerCase(), evidence_commitment: (await canonicalEvidenceCommitment(state)).toLowerCase(), manifest_hash: state.manifestHash.toLowerCase(), market_id: state.marketId, outcome: state.outcome, resolver_release_id: state.resolverReleaseId.toLowerCase() });
+  const evidenceCommitment = await canonicalEvidenceCommitment(state);
+  const preimage = canonicalResolverResultJson({ ...state, resolverResultCommitment: evidenceCommitment }, baseMarket);
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(preimage));
   return `0x${Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("")}` as Hex;
 }
 
-export function decodeFinalOutcome(returnData: string): 0 | 1 | 2 {
-  if (!/^0x[0-9a-fA-F]*$/.test(returnData)) throw new Error("invalid GenVM return data");
-  const decoded = genlayerAbi.calldata.decode(hexToBytes(returnData as Hex));
-  const value = typeof decoded === "string" ? decoded : "";
-  if (value === "YES") return 0;
-  if (value === "NO") return 1;
-  if (value === "VOID") return 2;
-  throw new Error("non-terminal GenLayer result");
+function decodeResolveCall(transaction: GenLayerTransaction): { marketId: string; attempt: number } {
+  const data = transaction.data as unknown as TransactionCallData | undefined;
+  const calldata = data?.calldata;
+  const bytes = calldata?.raw
+    ? Uint8Array.from(calldata.raw)
+    : calldata?.base64
+      ? Uint8Array.from(atob(calldata.base64), (character) => character.charCodeAt(0))
+      : undefined;
+  if (!bytes) throw new Error("transaction calldata is unavailable");
+  const decoded = genlayerAbi.calldata.decode(bytes);
+  if (!(decoded instanceof Map)) throw new Error("transaction calldata is malformed");
+  const method = decoded.get("");
+  const args = decoded.get("args");
+  const attempt = Array.isArray(args) && (typeof args[1] === "bigint" || typeof args[1] === "number") ? Number(args[1]) : Number.NaN;
+  if (method !== "resolve" || !Array.isArray(args) || typeof args[0] !== "string" || !Number.isSafeInteger(attempt)) throw new Error("transaction is not a valid resolve call");
+  return { marketId: args[0], attempt };
 }
 
-export async function assertWatcherEligible(transaction: GenLayerTransaction, trace: Trace, envelope: ResolutionEnvelope): Promise<void> {
+export async function assertWatcherEligible(transaction: GenLayerTransaction, state: FinalizedResolverState, envelope: ResolutionEnvelope): Promise<void> {
   const txId = transaction.txId ?? transaction.hash;
   if (txId?.toLowerCase() !== envelope.genlayerTxId.toLowerCase()) throw new Error("wrong transaction");
   const recipient = transaction.recipient ?? transaction.to_address;
   if (recipient?.toLowerCase() !== envelope.resolver.toLowerCase()) throw new Error("wrong resolver");
   if (transaction.lifecycle.state !== "finalized") throw new Error("transaction is not finalized");
   if (!isSuccessful(transaction) || transaction.txExecutionResultName !== "FINISHED_WITH_RETURN") throw new Error("GenLayer execution was not successful");
-  if (trace.result_code !== 1 || trace.stderr.length !== 0) throw new Error("GenVM trace was not successful");
-  if (!trace.finalizedState) throw new Error("finalized resolver state is required");
-  const state = trace.finalizedState;
+  const decodedCall = decodeResolveCall(transaction);
   if (envelope.baseChainId !== BASE_CHAIN_ID || envelope.genlayerChainId !== GENLAYER_CHAIN_ID) throw new Error("wrong chain");
+  if (decodedCall.marketId.toLowerCase() !== envelope.marketId.toLowerCase() || decodedCall.attempt !== envelope.attempt) throw new Error("resolve call arguments do not match envelope");
   if (state.marketId.toLowerCase() !== envelope.marketId.toLowerCase()) throw new Error("wrong market state");
   if (state.baseMarket.toLowerCase() !== envelope.baseMarket.toLowerCase()) throw new Error("wrong base market state");
   if (state.manifestHash.toLowerCase() !== envelope.manifestHash.toLowerCase()) throw new Error("wrong manifest state");
   if (state.resolverReleaseId.toLowerCase() !== envelope.resolverReleaseId.toLowerCase()) throw new Error("wrong resolver release state");
-  if (decodeFinalOutcome(trace.return_data) !== envelope.outcome) throw new Error("altered outcome");
   if (state.attempt !== envelope.attempt || state.outcome !== (["YES", "NO", "VOID"] as const)[envelope.outcome]) throw new Error("wrong resolver result");
   if (await canonicalEvidenceCommitment(state) !== envelope.evidenceCommitment) throw new Error("wrong evidence commitment");
   const resolverResultCommitment = await canonicalResolverResultCommitment(state, envelope.baseMarket);
@@ -90,7 +102,6 @@ export async function assertWatcherEligible(transaction: GenLayerTransaction, tr
 
 type WatcherClient = {
   getTransaction(args: { hash: TransactionHash }): Promise<GenLayerTransaction>;
-  debugTraceTransaction(args: { hash: TransactionHash }): Promise<Omit<Trace, "finalizedState">>;
   readContract(args: Record<string, unknown>): Promise<unknown>;
 };
 
@@ -108,11 +119,10 @@ export async function attestWithClient(envelope: ResolutionEnvelope, env: Env, c
   if (envelope.baseChainId !== BASE_CHAIN_ID || envelope.genlayerChainId !== GENLAYER_CHAIN_ID) throw new Error("wrong chain");
   if (!isAddress(envelope.baseMarket) || !isAddress(envelope.resolver) || !isAddress(envelope.gateway)) throw new Error("invalid address");
   const transaction = await client.getTransaction({ hash: envelope.genlayerTxId as TransactionHash });
-  const rawTrace = await client.debugTraceTransaction({ hash: envelope.genlayerTxId as TransactionHash });
   const binding = await client.readContract({ address: envelope.resolver, functionName: "get_binding_state", transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
   const attempt = await client.readContract({ address: envelope.resolver, functionName: "get_attempt", args: [envelope.attempt], transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
-  const trace = { ...rawTrace, finalizedState: parseState(binding, attempt) };
-  await assertWatcherEligible(transaction, trace, envelope);
+  const state = parseState(binding, attempt);
+  await assertWatcherEligible(transaction, state, envelope);
   const account = privateKeyToAccount(env.WATCHER_PRIVATE_KEY);
   const { gateway: verifyingContract, ...wireEnvelope } = envelope;
   const message = {

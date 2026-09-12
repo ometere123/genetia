@@ -10,9 +10,9 @@ const HealthSchema = z.object({ ok: z.boolean(), baseChainId: z.number(), genlay
 const RecordsSchema = z.array(z.record(z.unknown()));
 export class GenetiaClient {
   private readonly request: typeof fetch;
-  constructor(private readonly options: GenetiaClientOptions) { this.request = options.fetch ?? fetch; }
-  private async get<T>(path: string, schema: { parse(value: unknown): T }): Promise<T> {
-    const r = await this.request(`${this.options.baseUrl}/api${path}`, { headers: this.options.headers });
+  constructor(private readonly options: GenetiaClientOptions) { this.request = options.fetch ?? globalThis.fetch.bind(globalThis); }
+  private async get<T>(path: string, schema: { parse(value: unknown): T }, extraHeaders: Record<string, string> = {}): Promise<T> {
+    const r = await this.request(`${this.options.baseUrl}/api${path}`, { headers: { ...this.options.headers, ...extraHeaders } });
     if (!r.ok) throw new Error(`${path} ${r.status}`);
     return schema.parse(await r.json());
   }
@@ -31,8 +31,8 @@ export class GenetiaClient {
   async liquidity(id:string):Promise<ActivityRecord[]>{ return this.get(`/markets/${encodeURIComponent(id)}/liquidity`, RecordsSchema); }
   async resolution(id:string):Promise<ResolutionRecord>{return this.get(`/markets/${encodeURIComponent(id)}/resolution`, ResolutionRecordSchema);}
   async evidence(id:string):Promise<ActivityRecord[]>{ return this.get(`/markets/${encodeURIComponent(id)}/evidence`, RecordsSchema); }
-  async positions(address:string):Promise<ActivityRecord[]>{ return this.get(`/users/${address}/positions`, RecordsSchema); }
-  async history(address:string):Promise<ActivityRecord[]>{ return this.get(`/users/${address}/history`, RecordsSchema); }
+  async positions(address:string, headers:Record<string,string> = {}):Promise<ActivityRecord[]>{ return this.get(`/users/${encodeURIComponent(address)}/positions`, RecordsSchema, headers); }
+  async history(address:string, headers:Record<string,string> = {}):Promise<ActivityRecord[]>{ return this.get(`/users/${encodeURIComponent(address)}/history`, RecordsSchema, headers); }
   async quote(id:string, request: QuoteRequest):Promise<Quote>{ return this.post(`/markets/${encodeURIComponent(id)}/quote`, request, QuoteSchema); }
   async prepareTrade(id:string, request: QuoteRequest):Promise<TransactionPreparation>{ return this.post(`/markets/${encodeURIComponent(id)}/prepare-trade`, request, TransactionPreparationSchema); }
   async prepareProposalBond(proposal: Proposal, proposer: string): Promise<ProposalBondPreparation> {

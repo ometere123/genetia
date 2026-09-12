@@ -88,7 +88,15 @@ class MarketAdmissibility(gl.contract.Contract):
         return data
 
     def _require(self, data, field: str):
-        if not data.get(field): raise gl.vm.UserError("[EXPECTED] missing field: " + field)
+        if field not in data or data[field] is None: raise gl.vm.UserError("[EXPECTED] missing field: " + field)
+        # An empty fallback list means the proposal deliberately has no
+        # fallback source. It is present and valid; truthiness is not a
+        # suitable presence check for this optional collection.
+        if field == "fallback_sources":
+            if not isinstance(data[field], list): raise gl.vm.UserError("[EXPECTED] fallback_sources must be a list")
+            return
+        value = data[field]
+        if value == "" or value == [] or value == {}: raise gl.vm.UserError("[EXPECTED] missing field: " + field)
 
     def _prompt(self, data) -> str:
         return """Independently assess immutable YES/NO market terms. Evaluate question clarity, mutually exclusive YES and NO definitions, positive support for NO, timing, evidence identities/priority/fallback/corroboration, contradictions, and VOID conditions. Broad and long-tail subjects are allowed; never reject merely because a conventional oracle could answer. Return JSON only: {\"decision\":\"APPROVED|NEEDS_REVISION|REJECTED\",\"issue_codes\":[\"...\"]}. APPROVED requires no issues; NEEDS_REVISION is repairable ambiguity; REJECTED is abusive, contradictory, or inherently unresolvable. MANIFEST:\n""" + json.dumps(data, sort_keys=True, separators=(",", ":"))

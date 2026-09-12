@@ -12,7 +12,7 @@ def _evidence_commitment(evidence):
     return "0x" + hashlib.sha256(json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 def _result_commitment(market_id, base_market, manifest_hash, resolver_release_id, attempt, outcome, evidence_commitment):
-    value = {"attempt": attempt, "base_market": str(base_market).lower(), "evidence_commitment": evidence_commitment.lower(), "manifest_hash": manifest_hash.lower(), "market_id": str(market_id), "outcome": str(outcome), "resolver_release_id": str(resolver_release_id).lower()}
+    value = {"attempt": attempt, "base_market": str(base_market).lower(), "evidence_commitment": evidence_commitment.lower(), "manifest_hash": manifest_hash.lower(), "market_id": str(market_id).lower(), "outcome": str(outcome), "resolver_release_id": str(resolver_release_id).lower()}
     return "0x" + hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 def _json_value(value):
@@ -64,7 +64,10 @@ class MarketResolver(gl.contract.Contract):
             evidence = self._fetch_locked_evidence(data)
             usable = [item for item in evidence if item["available"]]
             if len(usable) < int(data.get("minimum_corroborating_sources", 1)):
-                return {"manifest_hash": self.manifest_hash, "outcome": "UNRESOLVED", "used_sources": [], "facts": []}
+                # Always persist the exact evidence collection used to compute
+                # the commitment. In particular, an empty collection is a real
+                # canonical value, not a missing field for downstream verifiers.
+                return {"manifest_hash": self.manifest_hash, "outcome": "UNRESOLVED", "used_sources": [], "facts": [], "evidence": []}
             candidate = _json_value(gl.nondet.exec_prompt(prompt + "\nEVIDENCE:\n" + json.dumps(usable, sort_keys=True, separators=(",", ":")), response_format="json"))
             evidence = [{"identity": item["identity"], "url": item["url"], "content_hash": hashlib.sha256(item["content"].encode("utf-8")).hexdigest()} for item in usable]
             return {"manifest_hash": str(candidate.get("manifest_hash", "")), "outcome": str(candidate.get("outcome", "")), "used_sources": sorted(set(str(v) for v in candidate.get("used_sources", []))), "facts": sorted(set(str(v)[:500] for v in candidate.get("facts", [])))[:20], "evidence": evidence}

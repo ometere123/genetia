@@ -9,6 +9,7 @@ import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { canonicalProposalId, verifyBondReceipt } from "./proposal-adapter";
 import { createHyperdriveProposalPersistence } from "./proposal-persistence";
+import { syncPrivyWalletIdentity } from "./privy-identity";
 import { PrivyClient } from "@privy-io/node";
 import { Pool } from "pg";
 
@@ -63,6 +64,11 @@ const requireWalletOwnership = async (c: any, identity: AuthIdentity, proposer: 
   // Privy subject in the isolated application schema.
   if (authVerifier !== verifyPrivy) return true;
   if (!c.env.GENETIA_DB?.connectionString) return false;
+  if (!c.env.PRIVY_APP_ID || !c.env.PRIVY_APP_SECRET) return false;
+  try {
+    const privy = new PrivyClient({ appId: c.env.PRIVY_APP_ID, appSecret: c.env.PRIVY_APP_SECRET });
+    await syncPrivyWalletIdentity(c.env.GENETIA_DB, identity, (userId) => privy.users()._get(userId));
+  } catch { return false; }
   const pool = new Pool({ connectionString: c.env.GENETIA_DB.connectionString, max: 1 });
   try {
     const result = await pool.query(
@@ -152,8 +158,17 @@ app.get("/market-proposals/:id", async (c) => {
   const proposal = await factory(c.env.GENETIA_DB).getProposal(proposalId);
   return proposal ? c.json(proposal) : c.json({ error: "proposal not found" }, 404);
 });
-app.get("/users/:address/positions", async (c) => { const wallet = address.parse(c.req.param("address")); return c.env.GENETIA_DB ? c.json(await factory(c.env.GENETIA_DB).getPositions(wallet)) : c.json({ error: "indexed position source is not configured" }, 503); });
-app.get("/users/:address/history", async (c) => { const wallet = address.parse(c.req.param("address")); return c.env.GENETIA_DB ? c.json(await factory(c.env.GENETIA_DB).getHistory(wallet)) : c.json({ error: "indexed history source is not configured" }, 503); });
+for (const collection of ["positions", "history"] as const) app.get(`/users/:address/${collection}`, async (c) => {
+  const identity = await requireAuth(c);
+  if (!identity) return c.json({ error: "authentication required" }, 401);
+  const parsedWallet = address.safeParse(c.req.param("address"));
+  if (!parsedWallet.success) return c.json({ error: "invalid wallet address" }, 400);
+  if (!await requireWalletOwnership(c, identity, parsedWallet.data as `0x${string}`)) return c.json({ error: "wallet is not linked to the authenticated Privy user" }, 403);
+  if (!c.env.GENETIA_DB) return c.json({ error: `indexed ${collection} source is not configured` }, 503);
+  return c.json(collection === "positions"
+    ? await factory(c.env.GENETIA_DB).getPositions(parsedWallet.data)
+    : await factory(c.env.GENETIA_DB).getHistory(parsedWallet.data));
+});
 return app;
 }
 const app = createApiApp();

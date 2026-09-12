@@ -2,6 +2,7 @@ import { Workflow, type WorkflowEvent, type WorkflowStep } from "cloudflare:work
 import { expectedJobKey, validateQueueJob, type QueueJob } from "./queue-jobs";
 import { Pool } from "pg";
 import { createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
+import { reconcileDueLifecycleIntents } from "./reconcile-due";
 import type { Address, Hex } from "viem";
 
 // A Workflow instance must not spend one step per 30 seconds for the whole
@@ -39,9 +40,44 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
            ON CONFLICT ("idempotencyKey") DO UPDATE SET
              "attempts" = "genetia_app"."WorkflowState"."attempts" + 1,
              "state" = CASE WHEN "genetia_app"."WorkflowState"."state" IN ('COMPLETE','FAILED') THEN "genetia_app"."WorkflowState"."state" ELSE 'RUNNING' END,
+             "nextRunAt" = NULL,
              "updatedAt" = now()`,
           [workflowKey, payload.kind, "proposalId" in payload ? payload.proposalId : "marketId" in payload ? payload.marketId : null, JSON.stringify(payload)],
         );
+        if (payload.kind === "reconcile-due-markets") {
+          const store = {
+            async claimDue(now: Date, leaseUntil: Date, limit: number) {
+              const connection = await pool.connect();
+              try {
+                await connection.query("BEGIN");
+                const result = await connection.query(
+                  `SELECT "idempotencyKey","nextRunAt","payload" FROM "genetia_app"."WorkflowState"
+                   WHERE "workflowType"='MARKET_ADMISSIBILITY'
+                     AND "state" IN ('RETRY','RECONCILE_CLAIMED') AND "nextRunAt" <= $1
+                   ORDER BY "nextRunAt" FOR UPDATE SKIP LOCKED LIMIT $2`,
+                  [now, limit],
+                );
+                for (const row of result.rows) await connection.query(
+                  `UPDATE "genetia_app"."WorkflowState" SET "state"='RECONCILE_CLAIMED',"nextRunAt"=$2,"updatedAt"=now() WHERE "idempotencyKey"=$1`,
+                  [row.idempotencyKey, leaseUntil],
+                );
+                await connection.query("COMMIT");
+                return result.rows.map((row) => ({ idempotencyKey: String(row.idempotencyKey), nextRunAt: new Date(row.nextRunAt), payload: row.payload }));
+              } catch (error) {
+                await connection.query("ROLLBACK");
+                throw error;
+              } finally { connection.release(); }
+            },
+            async releaseForRetry(idempotencyKey: string, retryAt: Date, error: string) {
+              await pool.query(
+                `UPDATE "genetia_app"."WorkflowState" SET "state"='RETRY',"nextRunAt"=$2,"lastError"=$3,"updatedAt"=now() WHERE "idempotencyKey"=$1`,
+                [idempotencyKey, retryAt, error],
+              );
+            },
+          };
+          const dispatched = await reconcileDueLifecycleIntents(store, this.env.GENETIA_JOBS, new Date());
+          return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, ...dispatched };
+        }
         if (payload.kind !== "market-admissibility") {
           return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true };
         }
@@ -56,10 +92,16 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
         if (!terms) throw new Error("durable proposal terms were not found");
         const store: AdmissibilityStore = {
           async createIfAbsent(value) {
-            const existing = await pool.query(`SELECT "payload" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey" = $1`, [value.operationId]);
-            if (existing.rows[0]) return { ...value, ...(existing.rows[0].payload as object) };
-            await pool.query(`INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey","workflowType","externalId","state","payload") VALUES ($1,'MARKET_ADMISSIBILITY',$2,'READY',$3::jsonb) ON CONFLICT DO NOTHING`, [value.operationId, value.proposalId, JSON.stringify(value)]);
-            return value;
+            const existing = await pool.query(`SELECT "state","externalId","payload" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey" = $1`, [value.operationId]);
+            if (existing.rows[0]) {
+              const body = (existing.rows[0].payload ?? {}) as Record<string, unknown>;
+              return { ...value, ...body, lifecycle: String(existing.rows[0].state ?? body.lifecycle ?? "READY") as never, txId: existing.rows[0].externalId ? String(existing.rows[0].externalId) as never : undefined };
+            }
+            const durableValue = { ...value, startedAt: new Date().toISOString() };
+            await pool.query(`INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey","workflowType","externalId","state","payload") VALUES ($1,'MARKET_ADMISSIBILITY',$2,'READY',$3::jsonb) ON CONFLICT DO NOTHING`, [value.operationId, value.proposalId, JSON.stringify(durableValue)]);
+            const inserted = await pool.query(`SELECT "state","externalId","payload" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey"=$1`, [value.operationId]);
+            const body = (inserted.rows[0]?.payload ?? durableValue) as Record<string, unknown>;
+            return { ...value, ...body, lifecycle: String(inserted.rows[0]?.state ?? "READY") as never };
           },
           async load(operationId) {
             const result = await pool.query(`SELECT "state","externalId","payload" FROM "genetia_app"."WorkflowState" WHERE "idempotencyKey" = $1`, [operationId]);
@@ -101,16 +143,32 @@ export class GenetiaLifecycleWorkflow extends Workflow<LifecycleWorkflowEnv, Que
               await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"=$2, "workflowStatus"='WAITING_FINALITY', "updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId, observation.lifecycle]);
             }
           },
+          async deferSubmissionRecovery(operationId, retryAt, reason) {
+            await pool.query(
+              `UPDATE "genetia_app"."WorkflowState" SET "state"='RETRY',"nextRunAt"=$2,"lastError"=$3,
+                 "payload"="payload" || '{"submissionRecoveryRequired":true}'::jsonb,"updatedAt"=now()
+               WHERE "idempotencyKey"=$1 AND "externalId" IS NULL`,
+              [operationId, retryAt, reason],
+            );
+            await pool.query(`UPDATE "genetia_app"."Proposal" SET "genlayerStatus"='SUBMITTING',"workflowStatus"='WAITING_FINALITY',"updatedAt"=now() WHERE "proposalId"=$1`, [payload.proposalId]);
+          },
         };
         const client = createStudioAdmissibilityClient({ GENLAYER_RPC: this.env.GENLAYER_RPC, GENLAYER_PRIVATE_KEY: this.env.GENLAYER_PRIVATE_KEY, MARKET_ADMISSIBILITY_ADDRESS: this.env.MARKET_ADMISSIBILITY_ADDRESS });
-        const txId = await submitAdmissibilityOnce(client, store, { proposalId: payload.proposalId, contract: this.env.MARKET_ADMISSIBILITY_ADDRESS, manifest: typeof terms === "string" ? terms : JSON.stringify(terms) });
+        let txId;
+        try {
+          txId = await submitAdmissibilityOnce(client, store, { proposalId: payload.proposalId, contract: this.env.MARKET_ADMISSIBILITY_ADDRESS, manifest: typeof terms === "string" ? terms : JSON.stringify(terms) });
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes("submission outcome is uncertain")) throw error;
+          await store.deferSubmissionRecovery?.(`admissibility:${payload.proposalId}`, new Date(Date.now() + 60_000), "remote submission requires address-history reconciliation");
+          return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, state: "WAITING_SUBMISSION_RECOVERY" };
+        }
         const observation = await followAdmissibility(client, store, payload.proposalId);
         return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, txId, state: observation.lifecycle, decision: observation.decision };
       } finally {
         await pool.end();
       }
     });
-    if (payload.kind !== "market-admissibility" || initial.decision || initial.state === "FAILED") return initial;
+    if (payload.kind !== "market-admissibility" || initial.decision || initial.state === "FAILED" || initial.state === "WAITING_SUBMISSION_RECOVERY") return initial;
     let current: any = initial;
     for (let poll = 0; poll < ADMISSIBILITY_POLL_SCHEDULE.length && !current.decision && current.state !== "FAILED"; poll += 1) {
       await step.sleep(`admissibility-finality-wait:${workflowKey}:${poll}`, ADMISSIBILITY_POLL_SCHEDULE[poll]);

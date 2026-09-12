@@ -1,31 +1,62 @@
 {
   "chainId": 84532,
+  "network": "base-sepolia",
+  "rpc": "https://sepolia.base.org",
   "status": "deployed-testnet",
-  "releaseId": "base-protocol-20260912",
-  "commitSha": "890650eecf78b34cf52ad6692216982b7de66259",
+  "releaseId": "base-protocol-create2-manifest-binding-20260912",
+  "commitSha": "212a72a035f8b7d75e445478736b41fd69a73171",
   "safeAddress": "0x05500AFb3667F5a006cbAe18d41CaE241e2893d3",
   "usdcAddress": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-  "deploymentBlock": 46700487,
-  "contracts": {
-    "ProtocolRegistry": {"address":"0xd3f9e3fda1d61796f36b5110790cec70745de6a6","deploymentTx":"0x56346a72231924e8b22b5f5f5d5e5488ac2e1f571d514cfbd447b5ccd36ba0cb"},
-    "OutcomeTokens": {"address":"0x058631710423a39a8e9fa1854904f65e26c4c293","deploymentTx":"0xfe3508d5fe491f0f541e3d7abc2b3e3f78421a07e451a59573c3e6e79ab31323"},
-    "RiskManager": {"address":"0xa37e6baa7775e65068d1e28a210e654ec806d6fd","deploymentTx":"0x8fc21d5dedd5b0adc58c080b4cf49a08ec9b6def42025c8ce6efe03191213565"},
-    "FeeRouter": {"address":"0x67f202ff1f3a8a4171c535055200c87e4ada11e2","deploymentTx":"0x882d759aaa08142c5e6e8e2a1bc7f0c79e72ddde9e47ebe71e82f633f47dfd88"},
-    "PoolReleaseDeployer": {"address":"0x05eb43e27e3a7202899ac92c0c69d41fddc1a190","deploymentTx":"0xf623894e8f242426193299d67bef49cf3dcd62e49fad5c508ea0f46ca0fc3215"},
-    "LMSRReleaseDeployer": {"address":"0x3f8915545b7b505acd4aade8502220a1102ee19e","deploymentTx":"0xde9591572daaac26e0407e9bc08902cab489f9782dd72f6190ca525b584c5621"},
-    "ProposalBondEscrow": {"address":"0xaa3ae6abc71b5873651ec0a96b8d5f99ef19edb3","deploymentTx":"0xde88c2c0a3cc518f6c9e72062ed16f3909652e5aef8c55e9690f17f3636d6535"},
-    "ResolutionGateway": {"address":"0x1212c53da0f208152fce396f34f82c96bafbc74c","deploymentTx":"0x336f60423d90684549d05bccc6fa7420b80285b6d0742e500df49d7d9d028377"},
-    "MarketFactory": {"address":"0x370914519fa0ad34a6138cb69f03a662137a4a9f","deploymentTx":"0x4e437953b40e6b1522550cca1df50333adf7bb24119b94fcbc8cbfe4bde13ad6"}
-  },
-  "integrationFixtures": {
-    "poolConnected": {
-      "marketId": "0x7f2d0c5f67ce146ca5d8569ffcafbde7281e2f4e60d347ff3b16a22f00d2b3eb",
-      "manifestHash": "0xa601a27cf1c9c9ddd326b0cbbd8978703900524637189d59e01866624086b83e",
-      "market": "0xfa0c448481dbf93bd25adc69bc171e2b61b6c936",
-      "createTx": "0xcba9e1971bd51ad78572bcd7ba59044223e761a0d8536d568e2ddae46077d87a",
-      "yesStakeTx": "0x6c589a1d2b74552813e6f0749b2505a25cf0d97de40927396938f36e1e052191",
-      "noStakeTx": "0xfa2c45ab19ed4c96c71e3004b9636a6616e621020bfdbf67af7e144f197340eb",
-      "status": "FUNDED_BOTH_SIDES"
+  "deploymentBlock": 46703768,
+  "sourceCommitBinding": "0x212a72a035f8b7d75e445478736b41fd69a73171000000000000000000000000",
+  "financialReleases": {
+    "pool": {
+      "releaseId": "0x07eddb3fee4258c0676aa1886a4c4aa2e49aeb51a4f77decde46f5ba00021227",
+      "label": "genetia.pool.create2-excludes-resolution-binding.2026-09-12",
+      "deployerAddress": "0x8E7217117A9451a821F51e66f694027a595Ff5aD",
+      "deployerBytecodeHash": "0x42149ce25f1e10164d2b86586aa254e573005925b6813a15bb904ceb1be24585"
+    },
+    "lmsr": {
+      "releaseId": "0xfe7f9fd6be248698f4a83f2d0a11a0bb905f711c1b59ea949cb05bd9398d20d8",
+      "label": "genetia.lmsr.create2-excludes-resolution-binding.2026-09-12",
+      "deployerAddress": "0xB32695A824384EBE34CA5679650B3FcEC25974Ef",
+      "deployerBytecodeHash": "0xafc7248f9fc4ab6881bbea64c7eeb8af0078c203dbe07b7f47122c8298533ea2"
     }
-  }
+  },
+  "contracts": {
+    "ProtocolRegistry": {"address":"0x7B7D6ca6aF87813BA05E11d4fF3ed2dB72555c4d","deploymentTx":"0xdbb3dbf435d493c883e8e179196803e5cb1dfb9cd475cf5a242708be01dad73e","bytecodeHash":"0x1c2e2602f61dbcc8b00679e9c34d0526b6bf3cc193016ede4a9e8c3ef7007176","receiptStatus":"success"},
+    "OutcomeTokens": {"address":"0x829217f2766d045157ae198a26a1848e6aBF95D5","deploymentTx":"0x85cf2944667ec2402167b958ec4929a1fa962059a07b776de87a145ca811a8b6","bytecodeHash":"0x57416e414b69adddb2bd63d1038af97fe7df6faeb48c4e896e1d82715102d774","receiptStatus":"success"},
+    "RiskManager": {"address":"0xc2B03cC7Feb6C00ECf5524613A64D9f108939C7e","deploymentTx":"0x6c07d8409846aead8efd97cb79e8173f6b0ed11055e7af3415fd0218e18d284f","bytecodeHash":"0x93d9addd5a9673aa8f40b79788afc85451f7d1362ab4b64cec3bb69a7a6a2a89","receiptStatus":"success"},
+    "FeeRouter": {"address":"0x6b14Ce3ab270B2aadf862dA0443d2A088FD31164","deploymentTx":"0xd59ef36c7489987e6fc99c40477f9dafc0ad22d8f2c7890832ed8d437b6631e8","bytecodeHash":"0x1675076fb4daaa3ad4b473796d11b6245b219ac8ae72596dcc18e8ec3de7c67c","receiptStatus":"success"},
+    "PoolReleaseDeployer": {"address":"0x8E7217117A9451a821F51e66f694027a595Ff5aD","deploymentTx":"0x3f9a9d44fb0b157c336210b7ae5680d81d29598e5022ba5ea8bed5a7400af01f","bytecodeHash":"0x42149ce25f1e10164d2b86586aa254e573005925b6813a15bb904ceb1be24585","receiptStatus":"success"},
+    "LMSRReleaseDeployer": {"address":"0xB32695A824384EBE34CA5679650B3FcEC25974Ef","deploymentTx":"0xc997f97f125a7f35cbf1ddb9c2180e8721e40e134d650f8f070d0161d7d04972","bytecodeHash":"0xafc7248f9fc4ab6881bbea64c7eeb8af0078c203dbe07b7f47122c8298533ea2","receiptStatus":"success"},
+    "ProposalBondEscrow": {"address":"0x6C80477aC761615Dc421859511991e736Cb39E20","deploymentTx":"0x9032ee06e3a99825febf9e6af30d3f9e428bce0d5914c81847791ec51623c2fe","bytecodeHash":"0x31818d645ea7519da280e114b433bc2e5bc4198d321c2416ad28f07d08faff27","receiptStatus":"success"},
+    "ResolutionGateway": {"address":"0x705F6e55d5bb5960d671E9B0574a426e08A62042","deploymentTx":"0x6ca7f103e77fa9c1e48933601231355ab9d21af48eeb4707f7c332a25eba0a22","bytecodeHash":"0x0f025f3299a997074a70c8e9c0b761ed031cc010b4f69988600dba28e8dedf5b","receiptStatus":"success"},
+    "MarketFactory": {"address":"0xc538a70e687034fFC21DE8fe551a13258ca49773","deploymentTx":"0x7df199330ebb0003e60c20794d8582b0342a041b71f19529b3ef5e63995887e8","bytecodeHash":"0x7cebaa58e0bf423666acde14aa4dcfe0438fee454981d7584cf7b8d27798912a","receiptStatus":"success"}
+  },
+  "deploymentHistory": [
+    {
+      "releaseId": "base-protocol-20260912-initial",
+      "status": "SUPERSEDED_FOR_NEW_DEPLOYMENTS",
+      "commitSha": "890650eecf78b34cf52ad6692216982b7de66259",
+      "deploymentBlock": 46700487,
+      "note": "Historical suite predates the manifest/CREATE2 circularity correction; preserved because deployed addresses and an integration pool remain on Base Sepolia.",
+      "poolFixture": {
+        "marketId": "0x7f2d0c5f67ce146ca5d8569ffcafbde7281e2f4e60d347ff3b16a22f00d2b3eb",
+        "market": "0xfa0c448481dbf93bd25adc69bc171e2b61b6c936",
+        "manifestHash": "0xa601a27cf1c9c9ddd326b0cbbd8978703900524637189d59e01866624086b83e",
+        "createTx": "0xcba9e1971bd51ad78572bcd7ba59044223e761a0d8536d568e2ddae46077d87a",
+        "yesStakeTx": "0x6c589a1d2b74552813e6f0749b2505a25cf0d97de40927396938f36e1e052191",
+        "noStakeTx": "0xfa2c45ab19ed4c96c71e3004b9636a6616e621020bfdbf67af7e144f197340eb",
+        "status": "FUNDED_BOTH_SIDES_NONCANONICAL"
+      }
+    }
+  ],
+  "watcherAddresses": [
+    "0xe11517D09A5960cA63F078fBA03D59c4E3cAd4c2",
+    "0x93811A25A926347dF76fC04f802c0388FC489744",
+    "0xFB36E94EE0aF65EFeC4DAE418a2C6e03000d1f7c",
+    "0x1B06a01687Fcc773986c6A67c716bFC9020E807b",
+    "0x82C267b7A065F594a7a669Ec19a18d4202674c94"
+  ]
 }

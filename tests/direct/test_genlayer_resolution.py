@@ -56,6 +56,14 @@ def test_admissibility_rejects_bad_timing_before_llm(direct_deploy, direct_vm):
         contract.assess("p2", json.dumps(bad))
 
 
+def test_admissibility_accepts_an_explicitly_empty_fallback_list(direct_deploy, direct_vm):
+    contract = direct_deploy("contracts/genlayer/market_admissibility.py", sdk_version="v0.6.0-rc3")
+    data = manifest(fallback_sources=[])
+    direct_vm.mock_llm(r"Independently assess", json.dumps({"decision": "APPROVED", "issue_codes": []}))
+    assert contract.assess("empty-fallbacks", json.dumps(data)) == "APPROVED"
+    assert json.loads(contract.get_assessment("empty-fallbacks")) == {"decision": "APPROVED", "issue_codes": []}
+
+
 @pytest.mark.parametrize(
     ("decision", "issue"),
     [("NEEDS_REVISION", "AMBIGUOUS_NO"), ("REJECTED", "CONTRADICTORY_TERMS")],

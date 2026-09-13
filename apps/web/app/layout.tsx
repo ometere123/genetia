@@ -14,7 +14,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <html lang="en" className="dark">
       <body className="bg-surface-0 text-slate-100 antialiased">
         <Providers>
-          <div className="flex min-h-screen flex-col">
+          <div className="site-shell">
             <SiteHeader />
             <div className="flex flex-1 flex-col">{children}</div>
             <footer className="border-t border-border px-4 py-8 text-center text-sm text-slate-500">

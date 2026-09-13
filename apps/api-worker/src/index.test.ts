@@ -26,6 +26,27 @@ const proposer = `0x${"77".repeat(20)}` as `0x${string}`;
 const proposal: Proposal = { idempotencyKey: "proposal-idempotency-001", market_id: "market-1", base_chain_id: 84532, genlayer_chain_id: 61997, question: "Will this proposal resolve?", yes_definition: "YES when the official result confirms it.", no_definition: "NO otherwise under the policy.", close_time: 1900000000, resolution_available_time: 1900003600, absolute_terminal_deadline: 1900349200, evidence_attempt_schedule_seconds: [0,1800,14400,86400,259200], void_conditions: ["insufficient evidence"], resolution_profile: "MULTI_SOURCE", authoritative_sources: [{ identity: "official", exact_url: "https://example.com/result", source_type: "official", priority: 0, required: true }], fallback_sources: [], corroboration_rule: "one source", minimum_corroborating_sources: 1, freshness_rule: "current", discovery_rule: "exact URL", official_source_required: true, arbitrary_caller_urls_forbidden: true, prompt_release_id: "prompt-a", manifest_release_id: "manifest-a", resolver_release_id: "resolver-a", engine: "POOL" };
 
 describe("canonical API contract", () => {
+  it("allows the production Vercel app origin and required browser headers", async () => {
+    const response = await app.request("http://localhost/api/health", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://genetiamarkets.vercel.app",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type,x-wallet-address",
+      },
+    }, { ...env, WEB_ORIGINS: "https://genetiamarkets.vercel.app,http://localhost:3000" });
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://genetiamarkets.vercel.app");
+    expect(response.headers.get("access-control-allow-headers")).toContain("x-wallet-address");
+  });
+
+  it("does not grant browser access to an unlisted origin", async () => {
+    const response = await app.request("http://localhost/api/health", {
+      headers: { Origin: "https://untrusted.example" },
+    }, { ...env, WEB_ORIGINS: "https://genetiamarkets.vercel.app" });
+    expect(response.headers.get("access-control-allow-origin")).not.toBe("https://untrusted.example");
+  });
+
   it("reports the locked chains and database health", async () => {
     const response = await app.request("http://localhost/api/health", {}, env);
     expect(response.status).toBe(200);

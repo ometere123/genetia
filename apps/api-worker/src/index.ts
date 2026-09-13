@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { z } from "zod";
 import { CHAIN, ProposalSchema, ProposalStatusSchema, QuoteRequestSchema, type ProposalBondPreparation, type ProposalStatus, type Quote, type QuoteRequest } from "@genetia/shared";
 import { createMarketReadModel, type MarketReadModel } from "./read-model";
@@ -13,7 +14,7 @@ import { syncPrivyWalletIdentity } from "./privy-identity";
 import { PrivyClient } from "@privy-io/node";
 import { Pool } from "pg";
 
-type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string };
+type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; WEB_ORIGINS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string };
 type ReadModelFactory = (db: Hyperdrive) => MarketReadModel;
 type QuoteProvider = (market: unknown, request: QuoteRequest, rpcUrl: string) => Promise<Quote>;
 export type ProposalService = {
@@ -24,6 +25,7 @@ export type AuthIdentity = { userId: string };
 export type AuthVerifier = (token: string, env: Env) => Promise<AuthIdentity | null>;
 const id = z.string().min(1).max(128);
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
+const allowedOrigins = (origins: string | undefined) => new Set((origins ?? "").split(",").map((origin) => origin.trim()).filter(Boolean));
 const verifyPrivy: AuthVerifier = async (token, env) => {
   if (!env.PRIVY_APP_ID || !env.PRIVY_APP_SECRET || !token) return null;
   try {
@@ -53,6 +55,12 @@ const defaultProposalService: ProposalService = {
 const wallet = (value: string | undefined): `0x${string}` | null => /^0x[0-9a-fA-F]{40}$/.test(value ?? "") ? value as `0x${string}` : null;
 export function createApiApp(factory: ReadModelFactory = createMarketReadModel, quoteProvider: QuoteProvider = liveQuote, proposalService: ProposalService = defaultProposalService, authVerifier: AuthVerifier = verifyPrivy) {
 const app = new Hono<{ Bindings: Env }>().basePath("/api");
+app.use("*", async (c, next) => cors({
+  origin: (origin) => allowedOrigins(c.env.WEB_ORIGINS).has(origin) ? origin : "",
+  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowHeaders: ["Authorization", "Content-Type", "x-wallet-address"],
+  maxAge: 600,
+})(c, next));
 const requireAuth = async (c: any): Promise<AuthIdentity | null> => {
   const header = c.req.header("authorization");
   if (!header?.startsWith("Bearer ") || header.length <= 7) return null;

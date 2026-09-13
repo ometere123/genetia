@@ -9,6 +9,7 @@ GENLAYER_CHAIN_ID = "61997"
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 PROPOSAL_BOND_ESCROW = "0x6C80477aC761615Dc421859511991e736Cb39E20"
+WEB_ORIGINS = "https://genetiamarkets.vercel.app,http://localhost:3000"
 
 [[queues.producers]]
 binding = "GENETIA_JOBS"

@@ -48,6 +48,16 @@ body {
   transition: background-color 120ms ease, color 120ms ease;
 }
 
+/* The whole site is intentionally rendered at 80%. Compensate the shell's
+   minimum height so browser zoom changes still leave the footer at the visual
+   bottom on short pages; long pages continue to grow naturally. */
+.site-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 125vh;
+  min-height: 125dvh;
+}
+
 /* Route mains participate in the shared flex column so the footer sits at the
    viewport edge on short pages and follows content on long pages. */
 main[class*="min-h-"] {

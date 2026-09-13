@@ -1,4 +1,115 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-:root{color-scheme:dark}body{margin:0;background:#09090b;color:#fafafa;font-family:system-ui,sans-serif}main{max-width:960px;margin:12vh auto;padding:2rem}h1{font-size:3rem}
+
+:root,
+.dark {
+  color-scheme: dark;
+  --surface-0: 10 11 15;
+  --surface-1: 17 19 24;
+  --surface-2: 24 27 34;
+  --surface-3: 30 34 41;
+  --surface-4: 37 42 51;
+  --border: 30 34 41;
+  --border-strong: 45 55 72;
+  --bg-app: rgb(var(--surface-0));
+  --fg-app: #f1f5f9;
+  --scrollbar-thumb: #2d3748;
+  --scrollbar-thumb-hover: #4a5568;
+}
+
+.light {
+  color-scheme: light;
+  --surface-0: 248 250 252;
+  --surface-1: 255 255 255;
+  --surface-2: 241 245 249;
+  --surface-3: 226 232 240;
+  --surface-4: 203 213 225;
+  --border: 226 232 240;
+  --border-strong: 203 213 225;
+  --bg-app: rgb(var(--surface-0));
+  --fg-app: #0f172a;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--bg-app); }
+
+body {
+  margin: 0;
+  zoom: 0.8;
+  background-color: var(--bg-app);
+  color: var(--fg-app);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* Route mains participate in the shared flex column so the footer sits at the
+   viewport edge on short pages and follows content on long pages. */
+main[class*="min-h-"] {
+  min-height: 0;
+  flex: 1 0 auto;
+}
+
+a { text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+
+.light .text-slate-50,
+.light .text-slate-100 { color: #0f172a; }
+.light .text-slate-200 { color: #1e293b; }
+.light .text-slate-300 { color: #334155; }
+.light .text-slate-400 { color: #475569; }
+.light .text-slate-500 { color: #64748b; }
+.light .text-slate-600 { color: #94a3b8; }
+.light .text-slate-700 { color: #cbd5e1; }
+.light .bg-slate-50 { background-color: #f8fafc; }
+.light .bg-slate-100 { background-color: #f1f5f9; }
+.light .bg-slate-200 { background-color: #e2e8f0; }
+.light .bg-slate-300 { background-color: #cbd5e1; }
+.light .text-white { color: #0f172a; }
+.light .text-brand-light { color: #4f46e5; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.prob-bar-yes { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.prob-bar-no { background: linear-gradient(90deg, #ef4444, #f87171); }
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.light .glass { background: rgba(15, 23, 42, 0.04); }
+
+.brand-mark {
+  background: linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%);
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.28);
+}
+.market-card {
+  background: linear-gradient(145deg, rgb(var(--surface-1)), rgb(var(--surface-0)));
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.market-card:hover {
+  border-color: rgba(129, 140, 248, 0.55);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+  transform: translateY(-2px);
+}
+.brand-gradient-text {
+  background: linear-gradient(110deg, #a78bfa, #67e8f9);
+  background-clip: text;
+  color: transparent;
+}
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.live-dot { animation: live-pulse 1.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

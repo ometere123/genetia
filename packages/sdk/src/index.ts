@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Market, ResolutionRecord, Proposal, QuoteRequest, Quote, TransactionPreparation, ProposalBondPreparation, ProposalStatus, MarketSchema, ResolutionRecordSchema, QuoteSchema, TransactionPreparationSchema, ProposalBondPreparationSchema, ProposalStatusSchema } from "@genetia/shared";
-export type { Proposal, ProposalBondPreparation, ProposalStatus, Quote, QuoteRequest, TransactionPreparation } from "@genetia/shared";
+export type { Market, Proposal, ProposalBondPreparation, ProposalStatus, Quote, QuoteRequest, TransactionPreparation } from "@genetia/shared";
 export type GenetiaClientOptions = { baseUrl: string; fetch?: typeof fetch; headers?: Record<string, string> };
 export type ActivityRecord = Record<string, unknown>;
 export type MarketPage = { items: Market[]; nextCursor: string | null };

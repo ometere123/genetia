@@ -123,6 +123,21 @@ describe("replayable Base event identity", () => {
     expect(advanced).toMatchObject({ nextBlock: 13n, lastBlockHash: `0x${"55".repeat(32)}` });
   });
 
+  it("indexes only confirmed blocks and reports when a continuation batch is needed", async () => {
+    let requested: { fromBlock: bigint; toBlock: bigint } | undefined;
+    const indexer = new BaseIndexer({
+      rpcUrl: "http://unused", deploymentBlock: 10n, batchSize: 10n, finalityConfirmations: 64n,
+      client: {
+        getBlockNumber: async () => 100n,
+        getBlock: async () => ({ hash: `0x${"55".repeat(32)}` as `0x${string}` }),
+        getLogs: async (args) => { requested = args; return []; },
+      },
+      store: { cursor: async () => null, persistEvents: async () => undefined, advanceCursor: async () => undefined },
+    });
+    await expect(indexer.runOnce()).resolves.toMatchObject({ fromBlock: 10n, toBlock: 19n, caughtUp: false });
+    expect(requested).toEqual({ fromBlock: 10n, toBlock: 19n });
+  });
+
   it("persists only rebuildable projection records", async () => {
     const calls: string[] = [];
     const fake = { $transaction: async (callback: (tx: unknown) => Promise<void>) => callback({

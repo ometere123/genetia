@@ -6,6 +6,33 @@ export const NETWORK = {
 } as const;
 export const CHAIN = { base: NETWORK.base.chainId, genlayer: NETWORK.genlayer.chainId } as const;
 export const USDC_DECIMALS = 6;
+export const MARKET_CATEGORIES = [
+  "crypto", "sports", "politics", "macro", "tech-ai", "science", "business",
+  "entertainment", "culture", "geopolitics", "internet-social", "other",
+] as const;
+export const MarketCategorySchema = z.enum(MARKET_CATEGORIES);
+export type MarketCategory = z.infer<typeof MarketCategorySchema>;
+export const marketCategoryLabel: Record<MarketCategory, string> = {
+  crypto: "Crypto", sports: "Sports", politics: "Politics", macro: "Macro",
+  "tech-ai": "Tech & AI", science: "Science", business: "Business",
+  entertainment: "Entertainment", culture: "Culture", geopolitics: "Geopolitics",
+  "internet-social": "Internet & Social", other: "Other",
+};
+function marketCategorySlug(value: string): string {
+  return value.trim().toLowerCase().replace(/[\/&]+/g, "-").replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+const categoryAliases: Record<string, MarketCategory> = {
+  technology: "tech-ai", tech: "tech-ai", ai: "tech-ai", "technology-ai": "tech-ai",
+  internet: "internet-social", social: "internet-social", "internet-and-social": "internet-social", "internet-social-media": "internet-social",
+};
+export function isKnownMarketCategory(value: string): boolean {
+  const slug = marketCategorySlug(value);
+  return (MARKET_CATEGORIES as readonly string[]).includes(slug) || slug in categoryAliases;
+}
+export function normalizeMarketCategory(value: string): string {
+  const slug = marketCategorySlug(value);
+  return categoryAliases[slug] ?? ((MARKET_CATEGORIES as readonly string[]).includes(slug) ? slug : "other");
+}
 export const EngineSchema = z.enum(["POOL", "LMSR"]);
 export const OutcomeSchema = z.enum(["YES", "NO", "VOID"]);
 export const ResolutionStateSchema = z.enum(["SUBMITTED", "PENDING", "ACCEPTED", "FINALIZED"]);
@@ -37,7 +64,7 @@ export const ResolutionManifestSchema = ResolutionManifestBase.refine((manifest)
 export const MarketSchema = z.object({
   id: z.string(), marketId: z.string(), engine: EngineSchema, title: z.string(), question: z.string(), description: z.string(),
   yesDefinition: z.string().optional(), noDefinition: z.string().optional(),
-  category: z.string(), status: z.string(), creatorAddress: AddressSchema, baseAddress: AddressSchema,
+  category: MarketCategorySchema, status: z.string(), creatorAddress: AddressSchema, baseAddress: AddressSchema,
   financialReleaseId: z.string(), resolverAddress: AddressSchema, resolverReleaseId: z.string(), manifestHash: HashSchema,
   closeTime: z.string().datetime(), resolutionAvailableTime: z.string().datetime(), terminalDeadline: z.string().datetime(),
   pool: z.object({ yesTotal: AmountSchema, noTotal: AmountSchema }).optional(),
@@ -64,7 +91,7 @@ export const QuoteSchema = z.object({
   feeRateBps: z.number().int().nonnegative().optional(), quoteAt: AmountSchema.optional(),
 });
 export const TransactionPreparationSchema = z.object({ chainId: z.literal(84532), to: AddressSchema, data: z.string().regex(/^0x[a-fA-F0-9]*$/), value: z.literal("0"), marketId: z.string().min(1), engine: EngineSchema, action: z.enum(["BUY", "SELL"]), side: z.enum(["YES", "NO"]), amount: AmountSchema, approval: z.object({ token: AddressSchema, spender: AddressSchema, amount: AmountSchema }).nullable() });
-export const ProposalSchema = ResolutionManifestBase.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, lmsrB: AmountSchema.optional() });
+export const ProposalSchema = ResolutionManifestBase.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, category: MarketCategorySchema.optional(), lmsrB: AmountSchema.optional() });
 export const ProposalBondPreparationSchema = z.object({
   chainId: z.literal(84532),
   proposalId: HashSchema,

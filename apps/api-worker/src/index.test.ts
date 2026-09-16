@@ -69,6 +69,26 @@ describe("canonical API contract", () => {
     await expect(response.json()).resolves.toMatchObject({ items: [{ marketId: "m1" }], nextCursor: "next" });
   });
 
+  it("supports bounded server-side search and canonical category values", async () => {
+    let received: { category?: string; search?: string } = {};
+    const searchModel: MarketReadModel = { ...model, listMarkets: async (options) => { received = options; return { items: [], nextCursor: null }; } };
+    const searchApp = createApiApp(() => searchModel, undefined, undefined, testAuth);
+    const response = await searchApp.request("http://localhost/api/markets?category=Tech%20%26%20AI&search=  election%20result%20&limit=20", {}, boundEnv);
+    expect(response.status).toBe(200);
+    expect(received).toMatchObject({ category: "tech-ai", search: "election result" });
+    expect((await searchApp.request(`http://localhost/api/markets?category=${encodeURIComponent("not-a-category")}`, {}, boundEnv)).status).toBe(400);
+    expect((await searchApp.request(`http://localhost/api/markets?search=${"x".repeat(121)}`, {}, boundEnv)).status).toBe(400);
+  });
+
+  it("maps the discovery Resolved filter to the database terminal lifecycle state", async () => {
+    let receivedStatus: string | undefined;
+    const statusModel: MarketReadModel = { ...model, listMarkets: async (options) => { receivedStatus = options.status; return { items: [], nextCursor: null }; } };
+    const statusApp = createApiApp(() => statusModel, undefined, undefined, testAuth);
+    expect((await statusApp.request("http://localhost/api/markets?status=RESOLVED", {}, boundEnv)).status).toBe(200);
+    expect(receivedStatus).toBe("TERMINAL");
+    expect((await statusApp.request("http://localhost/api/markets?status=MADE_UP", {}, boundEnv)).status).toBe(400);
+  });
+
   it("rejects malformed pagination and filter parameters", async () => {
     expect((await boundApp.request("http://localhost/api/markets?limit=0", {}, boundEnv)).status).toBe(400);
     expect((await boundApp.request("http://localhost/api/markets?engine=CLOB", {}, boundEnv)).status).toBe(400);

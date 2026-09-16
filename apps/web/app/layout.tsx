@@ -1,7 +1,7 @@
 import "./globals.css";
 import Providers from "./providers";
 import type { Metadata } from "next";
-import SiteHeader from "./site-header";
+import SiteHeader, { SiteFooter } from "./site-header";
 
 export const metadata: Metadata = {
   title: "Genetia Markets",
@@ -17,9 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="site-shell">
             <SiteHeader />
             <div className="flex flex-1 flex-col">{children}</div>
-            <footer className="border-t border-border px-4 py-8 text-center text-sm text-slate-500">
-              Genetia · Prediction markets on Base Sepolia · Resolved by GenLayer
-            </footer>
+            <SiteFooter />
           </div>
         </Providers>
       </body>

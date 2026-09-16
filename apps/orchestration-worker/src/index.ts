@@ -1,10 +1,11 @@
 import { classifyQueueError } from "./queue-jobs";
 import { GenetiaLifecycleWorkflow } from "./lifecycle-workflow";
 import { dispatchQueueJob } from "./queue-dispatch";
+import { scheduledReconciliationJobs } from "./scheduler-jobs";
 
 export { GenetiaLifecycleWorkflow };
 
-export interface Env { GENETIA_DB: Hyperdrive; GENETIA_JOBS: Queue; GENETIA_DLQ: Queue; GENETIA_WORKFLOWS: Workflow; GENLAYER_RPC:string; RECONCILE_SECRET?: string; }
+export interface Env { GENETIA_DB: Hyperdrive; GENETIA_JOBS: Queue; GENETIA_DLQ: Queue; GENETIA_WORKFLOWS: Workflow; GENLAYER_RPC:string; BASE_RPC: string; BASE_DEPLOYMENT_BLOCK: string; RECONCILE_SECRET?: string; }
 
 async function sameSecret(provided: string, expected: string): Promise<boolean> {
   const [left, right] = await Promise.all([crypto.subtle.digest("SHA-256", new TextEncoder().encode(provided)), crypto.subtle.digest("SHA-256", new TextEncoder().encode(expected))]);
@@ -26,8 +27,13 @@ export default {
       // replace it with wall-clock time: retries of the same Cron request
       // must coalesce even when they arrive in a different five-minute bin.
       const idempotencyKey = tick.startsWith("reconcile:") ? tick : `reconcile:${tick}`;
-      ctx.waitUntil(env.GENETIA_JOBS.send({ kind: "reconcile-due-markets", idempotencyKey }));
-      return Response.json({ ok: true, accepted: true, idempotencyKey });
+      let jobs;
+      try { jobs = scheduledReconciliationJobs(tick, env.BASE_DEPLOYMENT_BLOCK); }
+      catch { return Response.json({ error: "Base indexer is not configured" }, { status: 503 }); }
+      ctx.waitUntil(Promise.all([
+        ...jobs.map((job) => env.GENETIA_JOBS.send(job)),
+      ]));
+      return Response.json({ ok: true, accepted: true, idempotencyKey: jobs[0].idempotencyKey, scheduled: jobs.map((job) => job.kind) });
     }
     return new Response(JSON.stringify({ ok: true, service: "orchestration", method: request.method }), {
       headers: { "content-type": "application/json" },

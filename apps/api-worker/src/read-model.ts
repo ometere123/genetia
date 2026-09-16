@@ -1,8 +1,8 @@
 import { Pool, type QueryResultRow } from "pg";
-import { MarketSchema } from "@genetia/shared";
+import { MarketSchema, normalizeMarketCategory } from "@genetia/shared";
 
 export interface MarketReadModel {
-  listMarkets(options: { category?: string; engine?: string; status?: string; cursor?: string; limit?: number }): Promise<{ items: unknown[]; nextCursor: string | null }>;
+  listMarkets(options: { category?: string; engine?: string; status?: string; search?: string; cursor?: string; limit?: number }): Promise<{ items: unknown[]; nextCursor: string | null }>;
   getMarket(marketId: string): Promise<unknown | null>;
   getMarketCollection(marketId: string, collection: "trades" | "liquidity" | "evidence" | "resolution"): Promise<unknown[] | null>;
   getPositions(address: string): Promise<unknown[]>;
@@ -26,16 +26,20 @@ function hyperdriveSql(connectionString: string): Sql {
   };
 }
 
-function marketRow(row: Record<string, unknown>): unknown {
+export function marketRow(row: Record<string, unknown>): unknown {
   const field = (camel: string, snake: string) => row[camel] ?? row[snake];
   const date = (value: unknown) => value instanceof Date ? value.toISOString() : String(value);
   const manifest = (field("manifestJson", "manifest_json") ?? {}) as Record<string, unknown>;
   const engine = field("engine", "engine");
+  // Prisma's terminal lifecycle is intentionally named TERMINAL. The public
+  // discovery contract uses RESOLVED, so normalize at this read-model
+  // boundary instead of leaking the persistence enum into the UI.
+  const status = String(field("status", "status") ?? "");
   const poolYes = field("poolYesTotal", "pool_yes_total");
   const poolNo = field("poolNoTotal", "pool_no_total");
   return MarketSchema.parse({
     id: field("id", "id"), marketId: field("marketId", "market_id"), engine: field("engine", "engine"), title: field("title", "title"),
-    question: field("question", "question"), description: field("description", "description"), category: field("category", "category"), status: field("status", "status"),
+    question: field("question", "question"), description: field("description", "description"), category: normalizeMarketCategory(String(field("category", "category") ?? "other")), status: status === "TERMINAL" ? "RESOLVED" : status,
     creatorAddress: field("creatorAddress", "creator_address"), baseAddress: field("baseAddress", "base_address"),
     financialReleaseId: field("financialReleaseId", "financial_release_id"), resolverAddress: field("resolverAddress", "resolver_address"),
     resolverReleaseId: field("resolverReleaseId", "resolver_release_id"), manifestHash: field("manifestHash", "manifest_hash"),
@@ -59,11 +63,21 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
     async listMarkets(options) {
       const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);
       const cursor = decodeCursor(options.cursor);
+      const search = options.search?.trim();
       const rows = await sql`
-        SELECT * FROM "genetia_app"."Market"
-        WHERE (${options.category ?? null}::text IS NULL OR "category" = ${options.category ?? null})
+        WITH market_rows AS (
+          SELECT *, trim(both '-' from regexp_replace(regexp_replace(lower(trim("category")), '[^a-z0-9-]+', '-', 'g'), '-+', '-', 'g')) AS category_slug
+          FROM "genetia_app"."Market"
+        )
+        SELECT * FROM market_rows
+        WHERE (${options.category ?? null}::text IS NULL OR CASE
+            WHEN category_slug IN ('technology','tech','ai','technology-ai') THEN 'tech-ai'
+            WHEN category_slug IN ('internet','social','internet-and-social','internet-social-media') THEN 'internet-social'
+            WHEN category_slug IN ('crypto','sports','politics','macro','tech-ai','science','business','entertainment','culture','geopolitics','internet-social','other') THEN category_slug
+            ELSE 'other' END = ${options.category ?? null})
           AND (${options.engine ?? null}::text IS NULL OR "engine"::text = ${options.engine ?? null})
           AND (${options.status ?? null}::text IS NULL OR "status"::text = ${options.status ?? null})
+          AND (${search ?? null}::text IS NULL OR strpos(lower(concat_ws(' ', "title", "question", "description", "category", "marketId")), lower(${search ?? null})) > 0)
           AND (${cursor?.createdAt ?? null}::timestamptz IS NULL OR ("createdAt", "id") < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.id ?? null}))
         ORDER BY "createdAt" DESC, "id" DESC LIMIT ${limit + 1}`;
       const page = rows.slice(0, limit);

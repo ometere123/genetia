@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { CHAIN, ProposalSchema, ProposalStatusSchema, QuoteRequestSchema, type ProposalBondPreparation, type ProposalStatus, type Quote, type QuoteRequest } from "@genetia/shared";
+import { CHAIN, isKnownMarketCategory, MARKET_CATEGORIES, normalizeMarketCategory, ProposalSchema, ProposalStatusSchema, QuoteRequestSchema, type ProposalBondPreparation, type ProposalStatus, type Quote, type QuoteRequest } from "@genetia/shared";
 import { createMarketReadModel, type MarketReadModel } from "./read-model";
 import { prepareTrade } from "./transaction-adapter";
 import { liveQuote } from "./quote-adapter";
@@ -95,8 +95,17 @@ app.get("/markets", async (c) => {
   const limit = Number(c.req.query("limit") ?? "25");
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) return c.json({ error: "limit must be an integer from 1 to 100" }, 400);
   const engine = c.req.query("engine"); if (engine && !["POOL", "LMSR"].includes(engine)) return c.json({ error: "invalid engine" }, 400);
-  const status = c.req.query("status");
-  try { return c.json(await factory(c.env.GENETIA_DB).listMarkets({ category: c.req.query("category"), engine, status, cursor: c.req.query("cursor"), limit })); }
+  const rawCategory = c.req.query("category");
+  const category = rawCategory ? normalizeMarketCategory(rawCategory) : undefined;
+  if (rawCategory && (!isKnownMarketCategory(rawCategory) || !(MARKET_CATEGORIES as readonly string[]).includes(category ?? ""))) return c.json({ error: "invalid category" }, 400);
+  const rawSearch = c.req.query("search")?.trim();
+  if (rawSearch && (rawSearch.length > 120 || /[\u0000-\u001f]/.test(rawSearch))) return c.json({ error: "search must be at most 120 printable characters" }, 400);
+  const requestedStatus = c.req.query("status");
+  if (requestedStatus && !["ACTIVE", "RESOLVED"].includes(requestedStatus)) return c.json({ error: "status must be ACTIVE or RESOLVED" }, 400);
+  // Discovery uses user-facing lifecycle labels; the DB's terminal state is
+  // named TERMINAL, not RESOLVED.
+  const status = requestedStatus === "RESOLVED" ? "TERMINAL" : requestedStatus;
+  try { return c.json(await factory(c.env.GENETIA_DB).listMarkets({ category, engine, status, search: rawSearch || undefined, cursor: c.req.query("cursor"), limit })); }
   catch (error) { return c.json({ error: error instanceof Error ? error.message : "invalid request" }, 400); }
 });
 app.get("/markets/:id", async (c) => {

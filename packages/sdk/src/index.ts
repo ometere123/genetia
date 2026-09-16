@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { Market, ResolutionRecord, Proposal, QuoteRequest, Quote, TransactionPreparation, ProposalBondPreparation, ProposalStatus, MarketSchema, ResolutionRecordSchema, QuoteSchema, TransactionPreparationSchema, ProposalBondPreparationSchema, ProposalStatusSchema } from "@genetia/shared";
 export type { Market, Proposal, ProposalBondPreparation, ProposalStatus, Quote, QuoteRequest, TransactionPreparation } from "@genetia/shared";
+export { isKnownMarketCategory, MARKET_CATEGORIES, marketCategoryLabel, normalizeMarketCategory } from "@genetia/shared";
+export type { MarketCategory } from "@genetia/shared";
 export type GenetiaClientOptions = { baseUrl: string; fetch?: typeof fetch; headers?: Record<string, string> };
 export type ActivityRecord = Record<string, unknown>;
 export type MarketPage = { items: Market[]; nextCursor: string | null };
@@ -8,20 +10,34 @@ export type Health = { ok: boolean; baseChainId: number; genlayerChainId: number
 const MarketPageSchema = z.object({ items: z.array(MarketSchema), nextCursor: z.string().nullable() });
 const HealthSchema = z.object({ ok: z.boolean(), baseChainId: z.number(), genlayerChainId: z.number(), database: z.boolean() });
 const RecordsSchema = z.array(z.record(z.unknown()));
+
+function apiRequestUrl(baseUrl: string, path: string): string {
+  const configured = baseUrl.trim();
+  if (!configured) throw new Error("Genetia API is not configured. Set NEXT_PUBLIC_API_BASE_URL to the API Worker origin.");
+  let base: URL;
+  try { base = new URL(configured); }
+  catch { throw new Error("Genetia API URL must be an absolute HTTP(S) URL."); }
+  if (base.protocol !== "https:" && base.protocol !== "http:") throw new Error("Genetia API URL must use HTTP or HTTPS.");
+  // Accept either a Worker origin or an origin that already ends in /api.
+  // This avoids /api/api/... when Vercel is configured with the API prefix.
+  const prefix = base.pathname.replace(/\/+$/, "").replace(/\/api$/i, "");
+  return `${base.origin}${prefix}/api${path}`;
+}
+
 export class GenetiaClient {
   private readonly request: typeof fetch;
   constructor(private readonly options: GenetiaClientOptions) { this.request = options.fetch ?? globalThis.fetch.bind(globalThis); }
   private async get<T>(path: string, schema: { parse(value: unknown): T }, extraHeaders: Record<string, string> = {}): Promise<T> {
-    const r = await this.request(`${this.options.baseUrl}/api${path}`, { headers: { ...this.options.headers, ...extraHeaders } });
+    const r = await this.request(apiRequestUrl(this.options.baseUrl, path), { headers: { ...this.options.headers, ...extraHeaders } });
     if (!r.ok) throw new Error(`${path} ${r.status}`);
     return schema.parse(await r.json());
   }
   private async post<T>(path: string, body: unknown, schema: { parse(value: unknown): T }, extraHeaders: Record<string, string> = {}): Promise<T> {
-    const r = await this.request(`${this.options.baseUrl}/api${path}`, { method: "POST", headers: { "content-type": "application/json", ...this.options.headers, ...extraHeaders }, body: JSON.stringify(body) });
+    const r = await this.request(apiRequestUrl(this.options.baseUrl, path), { method: "POST", headers: { "content-type": "application/json", ...this.options.headers, ...extraHeaders }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error(`${path} ${r.status}`);
     return schema.parse(await r.json());
   }
-  async markets(params: { category?: string; engine?: "POOL" | "LMSR"; status?: string; cursor?: string; limit?: number } = {}): Promise<MarketPage> {
+  async markets(params: { category?: string; engine?: "POOL" | "LMSR"; status?: "ACTIVE" | "RESOLVED"; search?: string; cursor?: string; limit?: number } = {}): Promise<MarketPage> {
     const query = new URLSearchParams(); for (const [key, value] of Object.entries(params)) if (value !== undefined) query.set(key, String(value));
     return this.get(`/markets${query.size ? `?${query}` : ""}`, MarketPageSchema);
   }

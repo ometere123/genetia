@@ -3,6 +3,7 @@ import { expectedJobKey, validateQueueJob, type QueueJob } from "./queue-jobs";
 import { Pool } from "pg";
 import { createStudioAdmissibilityClient, followAdmissibility, submitAdmissibilityOnce, type AdmissibilityStore } from "./admissibility-lifecycle";
 import { reconcileDueLifecycleIntents } from "./reconcile-due";
+import { createPgIndexerStore, runBaseIndexJob } from "./base-index-workflow";
 import type { Address, Hex } from "viem";
 
 // A Workflow instance must not spend one step per 30 seconds for the whole
@@ -20,6 +21,8 @@ export interface LifecycleWorkflowEnv {
   GENLAYER_RPC: string;
   GENLAYER_PRIVATE_KEY?: Hex;
   MARKET_ADMISSIBILITY_ADDRESS?: Address;
+  BASE_RPC: string;
+  BASE_DEPLOYMENT_BLOCK: string;
 }
 
 /** Durable entry point. Each side effect belongs in a named step so a restart
@@ -77,6 +80,16 @@ export class GenetiaLifecycleWorkflow extends WorkflowEntrypoint<LifecycleWorkfl
           };
           const dispatched = await reconcileDueLifecycleIntents(store, this.env.GENETIA_JOBS, new Date());
           return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, ...dispatched };
+        }
+        if (payload.kind === "base-index") {
+          if (!this.env.BASE_RPC || !/^\d+$/.test(this.env.BASE_DEPLOYMENT_BLOCK)) throw new Error("Base indexer RPC/deployment block is not configured");
+          const store = createPgIndexerStore(pool);
+          const result = await runBaseIndexJob(
+            { rpcUrl: this.env.BASE_RPC, deploymentBlock: BigInt(this.env.BASE_DEPLOYMENT_BLOCK), finalityConfirmations: 64n, idempotencyKey: payload.idempotencyKey },
+            { store, queue: this.env.GENETIA_JOBS },
+          );
+          await pool.query(`UPDATE "genetia_app"."WorkflowState" SET "state"='COMPLETE',"nextRunAt"=NULL,"lastError"=NULL,"payload"="payload" || $2::jsonb,"updatedAt"=now() WHERE "idempotencyKey"=$1`, [workflowKey, JSON.stringify({ indexedThrough: result.toBlock.toString(), decoded: result.decoded, scheduledContinuation: result.scheduledContinuation })]);
+          return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true, ...result, toBlock: result.toBlock.toString(), nextBlock: result.nextBlock.toString() };
         }
         if (payload.kind !== "market-admissibility") {
           return { idempotencyKey: payload.idempotencyKey, workflowKey, kind: payload.kind, persisted: true };

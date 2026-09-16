@@ -6,6 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 MARKET_ADMISSIBILITY_ADDRESS = "0x2C0d57182cb4860AC03252181e5a908747111A36"
+BASE_RPC = "https://sepolia.base.org"
+BASE_DEPLOYMENT_BLOCK = "46703768"
 
 [[queues.producers]]
 binding = "GENETIA_JOBS"

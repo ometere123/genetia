@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GenetiaClient } from "./index";
+import { GenetiaClient, MARKET_CATEGORIES, normalizeMarketCategory } from "./index";
 
 const market = { id: "db-id", marketId: "m1", engine: "POOL", title: "Market", question: "Will this happen?", description: "A market", category: "crypto", status: "ACTIVE", creatorAddress: `0x${"11".repeat(20)}`, baseAddress: `0x${"22".repeat(20)}`, financialReleaseId: "pool-a", resolverAddress: `0x${"33".repeat(20)}`, resolverReleaseId: "resolver-a", manifestHash: `0x${"44".repeat(32)}`, closeTime: "2026-01-01T00:00:00.000Z", resolutionAvailableTime: "2026-01-02T00:00:00.000Z", terminalDeadline: "2026-01-06T00:00:00.000Z", terminalOutcome: null };
 
@@ -8,12 +8,41 @@ function client(body: unknown, status = 200, seen: string[] = []) {
 }
 
 describe("GenetiaClient", () => {
+  it("normalizes legacy and display category names to canonical filter slugs", () => {
+    expect(normalizeMarketCategory("Technology")).toBe("tech-ai");
+    expect(normalizeMarketCategory("Tech & AI")).toBe("tech-ai");
+    expect(normalizeMarketCategory("Internet & Social")).toBe("internet-social");
+    expect(normalizeMarketCategory("unmapped legacy category")).toBe("other");
+    expect(MARKET_CATEGORIES).toContain("other");
+  });
+
   it("requests filtered paginated markets and validates the response", async () => {
     const seen: string[] = [];
-    const result = await client({ items: [market], nextCursor: "next" }, 200, seen).markets({ category: "crypto", engine: "POOL", status: "ACTIVE", limit: 10 });
+    const result = await client({ items: [market], nextCursor: "next" }, 200, seen).markets({ category: "crypto", engine: "POOL", status: "ACTIVE", search: "election result", limit: 10 });
     expect(result.items[0]?.marketId).toBe("m1");
     expect(seen[0]).toContain("category=crypto");
+    expect(seen[0]).toContain("search=election+result");
     expect(seen[0]).toContain("engine=POOL");
+  });
+
+  it("normalizes an API origin that already includes /api", async () => {
+    const seen: string[] = [];
+    const api = new GenetiaClient({
+      baseUrl: "https://api.example/api/",
+      fetch: async (input) => {
+        seen.push(String(input));
+        return new Response(JSON.stringify({ items: [], nextCursor: null }), { status: 200 });
+      },
+    });
+    await api.markets();
+    expect(seen).toEqual(["https://api.example/api/markets"]);
+  });
+
+  it("fails clearly instead of sending API requests to the Vercel page origin when unconfigured", async () => {
+    let requested = false;
+    const api = new GenetiaClient({ baseUrl: "", fetch: async () => { requested = true; return new Response("{}", { status: 200 }); } });
+    await expect(api.markets()).rejects.toThrow("Set NEXT_PUBLIC_API_BASE_URL");
+    expect(requested).toBe(false);
   });
 
   it("covers market detail, prices, activity, proposal, positions, history, and health", async () => {

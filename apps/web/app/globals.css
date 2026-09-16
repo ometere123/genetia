@@ -58,6 +58,14 @@ body {
   min-height: 125dvh;
 }
 
+/* Route content must share the shell's flex height, not add a second viewport
+   below the fixed header. This keeps the footer at the visual bottom at 80%
+   site scaling while allowing long content to push it down naturally. */
+.site-shell > div > main.min-h-screen {
+  min-height: auto;
+  flex: 1 0 auto;
+}
+
 /* Route mains participate in the shared flex column so the footer sits at the
    viewport edge on short pages and follows content on long pages. */
 main[class*="min-h-"] {

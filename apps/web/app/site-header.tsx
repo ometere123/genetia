@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import AuthControls from "./auth-controls";
+import { LOCALES, localeNames, useI18n, type Locale } from "./i18n";
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const { locale, setLocale, t } = useI18n();
   const [query, setQuery] = useState("");
   const [light, setLight] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -53,25 +55,30 @@ export default function SiteHeader() {
 
       <form onSubmit={submitSearch} role="search" className="relative hidden w-[clamp(8rem,16vw,230px)] shrink-0 md:block">
         <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <input aria-label="Search markets" placeholder="Search markets…" value={query} onChange={(event) => search(event.target.value)} className="w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 transition focus:border-brand/60 focus:bg-surface-3 focus:outline-none" />
+        <input aria-label={t("search.label")} placeholder={t("search.placeholder")} value={query} onChange={(event) => search(event.target.value)} className="w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 transition focus:border-brand/60 focus:bg-surface-3 focus:outline-none" />
       </form>
 
       <nav aria-label="Primary" className="hidden shrink-0 items-center gap-0.5 xl:flex">
-        <HeaderLink href="/" active={pathname === "/"}>Markets</HeaderLink>
-        <HeaderLink href="/portfolio" active={pathname.startsWith("/portfolio")}>Portfolio</HeaderLink>
-        <HeaderLink href="/wallet" active={pathname.startsWith("/wallet")}>Wallet</HeaderLink>
-        <HeaderLink href="/about" active={pathname.startsWith("/about")}>How it works</HeaderLink>
+        <HeaderLink href="/" active={pathname === "/"}>{t("nav.markets")}</HeaderLink>
+        <HeaderLink href="/portfolio" active={pathname.startsWith("/portfolio")}>{t("nav.portfolio")}</HeaderLink>
+        <HeaderLink href="/wallet" active={pathname.startsWith("/wallet")}>{t("nav.wallet")}</HeaderLink>
+        <HeaderLink href="/about" active={pathname.startsWith("/about")}>{t("nav.about")}</HeaderLink>
       </nav>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <button type="button" onClick={() => setMobileSearchOpen((value) => !value)} aria-label="Search markets" aria-expanded={mobileSearchOpen} className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface-2 text-slate-400 md:hidden"><Icon name="search" className="h-4 w-4" /></button>
         <button type="button" onClick={toggleTheme} aria-label={light ? "Switch to dark mode" : "Switch to light mode"} className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface-2 text-slate-400 transition hover:border-border-strong hover:text-white"><Icon name={light ? "moon" : "sun"} className="h-4 w-4" /></button>
-        <span className="hidden h-9 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 text-[11px] font-semibold text-slate-400 sm:flex"><Icon name="globe" className="h-3.5 w-3.5" /> EN <span className="text-slate-600">⌄</span></span>
+        <label className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 text-[11px] font-semibold text-slate-400" aria-label={t("language.label")}><Icon name="globe" className="h-3.5 w-3.5" /><select aria-label={t("language.label")} value={locale} onChange={(event) => setLocale(event.target.value as Locale)} className="max-w-[84px] cursor-pointer appearance-none bg-transparent pr-1 text-[11px] text-slate-300 outline-none">{LOCALES.map((item) => <option key={item} value={item} className="bg-surface-1">{item.toUpperCase()} · {localeNames[item]}</option>)}</select></label>
         <AuthControls />
       </div>
     </div>
-    {mobileSearchOpen && <form onSubmit={submitSearch} role="search" className="relative border-t border-border bg-surface-0 p-3 md:hidden"><Icon name="search" className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input autoFocus aria-label="Search markets" placeholder="Search markets…" value={query} onChange={(event) => search(event.target.value)} className="w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-brand/60 focus:outline-none" /></form>}
+    {mobileSearchOpen && <form onSubmit={submitSearch} role="search" className="relative border-t border-border bg-surface-0 p-3 md:hidden"><Icon name="search" className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input autoFocus aria-label={t("search.label")} placeholder={t("search.placeholder")} value={query} onChange={(event) => search(event.target.value)} className="w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-brand/60 focus:outline-none" /></form>}
   </header>;
+}
+
+export function SiteFooter() {
+  const { t } = useI18n();
+  return <footer className="border-t border-border px-4 py-8 text-center text-sm text-slate-500">{t("footer")}</footer>;
 }
 
 function HeaderLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {

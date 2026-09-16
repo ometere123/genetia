@@ -4,13 +4,14 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseAbi, type Address } from "viem";
 import { baseSepolia } from "viem/chains";
-import { GenetiaClient, type Proposal } from "@genetia/sdk";
+import { GenetiaClient, MARKET_CATEGORIES, type MarketCategory, type Proposal } from "@genetia/sdk";
 import { getAccessToken, useWallets } from "@privy-io/react-auth";
+import { useI18n } from "../i18n";
 
-const categories = ["crypto", "sports", "politics", "macro", "tech/AI", "science", "business", "entertainment", "culture", "geopolitics", "internet/social"];
 const usdcAbi = parseAbi(["function approve(address spender, uint256 amount)"]);
 
 export default function CreateMarketPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [address, setAddress] = useState<Address>();
   const [status, setStatus] = useState("");
@@ -36,6 +37,7 @@ export default function CreateMarketPage() {
     if (!Number.isSafeInteger(close) || !Number.isSafeInteger(resolution) || resolution <= close) return setStatus("Resolution must be after close time.");
     const proposal: Proposal = {
       idempotencyKey: crypto.randomUUID(), market_id: crypto.randomUUID(), base_chain_id: 84532, genlayer_chain_id: 61997,
+      category: String(form.get("category")) as MarketCategory,
       question: String(form.get("question")), yes_definition: String(form.get("yesDefinition")), no_definition: String(form.get("noDefinition")),
       close_time: close, resolution_available_time: resolution, absolute_terminal_deadline: resolution + 345600,
       evidence_attempt_schedule_seconds: [0, 1800, 14400, 86400, 259200], void_conditions: ["insufficient authoritative evidence by terminal deadline"],
@@ -70,28 +72,28 @@ export default function CreateMarketPage() {
   const labelClass = "block text-xs font-medium text-slate-400";
   return <main className="flex-1 bg-surface-0 px-4 py-8 text-slate-100 sm:px-6 sm:py-12">
     <section className="mx-auto max-w-4xl">
-      <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-brand-light transition hover:text-white">← <span>Markets</span></Link>
+      <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-brand-light transition hover:text-white">← <span>{t("create.back")}</span></Link>
       <div className="mt-6 overflow-hidden rounded-3xl border border-border bg-surface-1 shadow-2xl shadow-black/10">
         <div className="border-b border-border bg-[radial-gradient(ellipse_at_top_left,rgba(99,102,241,0.16),transparent_65%)] px-5 py-7 sm:px-8 sm:py-9">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-light">Creator studio · Base Sepolia</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Create a market</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Write a question with precise YES/NO terms and verifiable sources. Your wallet signs the fixed 2 USDC proposal bond; Genetia never takes custody.</p>
-          <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-medium text-slate-300"><span className="rounded-full border border-border bg-surface-1/80 px-3 py-1.5">01 · Define terms</span><span className="rounded-full border border-border bg-surface-1/80 px-3 py-1.5">02 · Lock bond</span><span className="rounded-full border border-border bg-surface-1/80 px-3 py-1.5">03 · Admissibility review</span></div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-light">{t("create.eyebrow")}</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{t("create.title")}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">{t("create.description")}</p>
+          <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-medium text-slate-300"><span className="rounded-full border border-border bg-surface-1/80 px-3 py-1.5">{t("create.step1")}</span><span className="rounded-full border border-border bg-surface-1/80 px-3 py-1.5">{t("create.step2")}</span><span className="rounded-full border border-border bg-surface-1/80 px-3 py-1.5">{t("create.step3")}</span></div>
         </div>
         <form onSubmit={submit} className="space-y-6 p-5 sm:p-8">
-          <section className="space-y-4"><div><h2 className="text-sm font-semibold text-slate-100">The question</h2><p className="mt-1 text-xs text-slate-500">Keep it objective, time-bounded, and resolvable from public evidence.</p></div>
-            <label className={labelClass}>Market question<input required minLength={8} name="question" placeholder="Will … by …?" className={fieldClass} /></label>
-            <div className="grid gap-4 md:grid-cols-2"><label className={labelClass}>YES resolves when<textarea required minLength={8} name="yesDefinition" placeholder="State the exact condition for YES." className={`${fieldClass} h-28 resize-y`} /></label><label className={labelClass}>NO resolves when<textarea required minLength={8} name="noDefinition" placeholder="State the exact condition for NO." className={`${fieldClass} h-28 resize-y`} /></label></div>
+          <section className="space-y-4"><div><h2 className="text-sm font-semibold text-slate-100">{t("create.questionSection")}</h2><p className="mt-1 text-xs text-slate-500">{t("create.questionHelp")}</p></div>
+            <label className={labelClass}>{t("create.questionLabel")}<input required minLength={8} name="question" placeholder={t("create.questionPlaceholder")} className={fieldClass} /></label>
+            <div className="grid gap-4 md:grid-cols-2"><label className={labelClass}>{t("create.yesDefinition")}<textarea required minLength={8} name="yesDefinition" placeholder={t("create.yesPlaceholder")} className={`${fieldClass} h-28 resize-y`} /></label><label className={labelClass}>{t("create.noDefinition")}<textarea required minLength={8} name="noDefinition" placeholder={t("create.noPlaceholder")} className={`${fieldClass} h-28 resize-y`} /></label></div>
           </section>
-          <section className="space-y-4 border-t border-border pt-6"><div><h2 className="text-sm font-semibold text-slate-100">Market setup</h2><p className="mt-1 text-xs text-slate-500">Choose the trading engine and an authoritative source.</p></div>
-            <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>Category<select name="category" className={fieldClass}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><label className={labelClass}>Trading engine<select name="engine" className={fieldClass}><option value="POOL">Pool · peer liquidity</option><option value="LMSR">LMSR · continuous pricing</option></select></label></div>
-            <label className={labelClass}>Authoritative source URL<input required type="url" name="source" placeholder="https://…" className={fieldClass} /></label>
-            <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>Market closes<input required type="datetime-local" name="closeTime" className={fieldClass} /></label><label className={labelClass}>Resolution begins<input required type="datetime-local" name="resolutionTime" className={fieldClass} /></label></div>
+          <section className="space-y-4 border-t border-border pt-6"><div><h2 className="text-sm font-semibold text-slate-100">{t("create.setup")}</h2><p className="mt-1 text-xs text-slate-500">{t("create.setupHelp")}</p></div>
+            <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>{t("create.category")}<select name="category" className={fieldClass}>{MARKET_CATEGORIES.map((category) => <option key={category} value={category}>{t(`category.${category}`)}</option>)}</select></label><label className={labelClass}>{t("create.engine")}<select name="engine" className={fieldClass}><option value="POOL">{t("create.poolEngine")}</option><option value="LMSR">{t("create.lmsrEngine")}</option></select></label></div>
+            <label className={labelClass}>{t("create.source")}<input required type="url" name="source" placeholder="https://…" className={fieldClass} /></label>
+            <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>{t("create.closeTime")}<input required type="datetime-local" name="closeTime" className={fieldClass} /></label><label className={labelClass}>{t("create.resolutionTime")}<input required type="datetime-local" name="resolutionTime" className={fieldClass} /></label></div>
           </section>
-          <section className="rounded-2xl border border-brand/25 bg-brand-muted/40 p-4 sm:p-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand-light" aria-hidden="true">◈</span><div><h2 className="text-sm font-semibold text-white">Proposal bond · 2 USDC</h2><p className="mt-1 text-xs leading-5 text-slate-400">The API prepares the exact escrow transaction. The connected wallet checks allowance, approves if needed, then signs the bond. No proposal is marked paid until Base confirms the receipt.</p></div></div></section>
-          <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={connect} className="rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-brand/50 hover:bg-surface-3">{address ? `Wallet ${address.slice(0, 6)}…${address.slice(-4)}` : "Connect wallet"}</button><button className="rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-dark">Prepare bond and submit</button></div>
+          <section className="rounded-2xl border border-brand/25 bg-brand-muted/40 p-4 sm:p-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand-light" aria-hidden="true">◈</span><div><h2 className="text-sm font-semibold text-white">{t("create.bondTitle")}</h2><p className="mt-1 text-xs leading-5 text-slate-400">{t("create.bondBody")}</p></div></div></section>
+          <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={connect} className="rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-brand/50 hover:bg-surface-3">{address ? `Wallet ${address.slice(0, 6)}…${address.slice(-4)}` : t("create.connectWallet")}</button><button className="rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-dark">{t("create.prepareSubmit")}</button></div>
           {status && <p role="status" className="rounded-xl border border-brand/20 bg-brand-muted/40 p-3 text-sm text-brand-light">{status}</p>}{bondTx && <p className="break-all font-mono text-xs text-slate-500">Bond transaction: {bondTx}</p>}
-          <p className="text-center text-[11px] text-slate-600">Your selected user-owned wallet signs every transaction. Genetia does not hold your keys or betting balance.</p>
+          <p className="text-center text-[11px] text-slate-600">{t("create.walletFootnote")}</p>
         </form>
       </div>
     </section>

@@ -17,6 +17,8 @@ export type BaseIndexerConfig = {
   secondaryRpcUrl?: string;
   deploymentBlock: bigint;
   batchSize?: bigint;
+  /** Keep unfinalized head blocks out of the public/event projection. */
+  finalityConfirmations?: bigint;
   store: IndexerStore;
   /** Test seam for deterministic RPC fixtures; production uses rpcUrl. */
   client?: RpcClient;
@@ -48,11 +50,13 @@ export class BaseIndexer {
     }
   }
 
-  async runOnce(toBlock?: bigint): Promise<{ fromBlock: bigint; toBlock: bigint; decoded: number }> {
+  async runOnce(toBlock?: bigint): Promise<{ fromBlock: bigint; toBlock: bigint; decoded: number; caughtUp: boolean }> {
     const cursor = await this.config.store.cursor(this.chainId);
     let from = cursor?.nextBlock ?? this.config.deploymentBlock;
-    const head = toBlock ?? await this.withFallback((client) => client.getBlockNumber());
-    if (from > head) return { fromBlock: from, toBlock: head, decoded: 0 };
+    const latest = toBlock ?? await this.withFallback((client) => client.getBlockNumber());
+    const confirmations = this.config.finalityConfirmations ?? 0n;
+    const head = latest >= confirmations ? latest - confirmations : 0n;
+    if (from > head) return { fromBlock: from, toBlock: head, decoded: 0, caughtUp: true };
     const end = from + this.batchSize - 1n < head ? from + this.batchSize - 1n : head;
     const logs = await this.withFallback((client) => client.getLogs({ fromBlock: from, toBlock: end }));
     const decoded = decodeBaseLogs(logs.map((log) => ({
@@ -68,6 +72,6 @@ export class BaseIndexer {
     await this.config.store.persistEvents(decoded);
     const block = await this.withFallback((client) => client.getBlock({ blockNumber: end }));
     await this.config.store.advanceCursor?.({ chainId: this.chainId, deploymentBlock: cursor?.deploymentBlock ?? this.config.deploymentBlock, nextBlock: end + 1n, lastBlockHash: block.hash });
-    return { fromBlock: from, toBlock: end, decoded: decoded.length };
+    return { fromBlock: from, toBlock: end, decoded: decoded.length, caughtUp: end >= head };
   }
 }

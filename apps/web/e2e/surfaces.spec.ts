@@ -84,7 +84,9 @@ test("discovery sends category and engine filters to the API and appends cursor 
 });
 
 test("Spanish and Portuguese locale choices persist and localize discovery states", async ({ page }) => {
-  await mockReadApi(page);
+  await page.route("**/api/markets**", async (route) => {
+    await route.fulfill({ json: { items: [], nextCursor: null } });
+  });
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const language = page.locator("select").first();
   await language.selectOption("es");

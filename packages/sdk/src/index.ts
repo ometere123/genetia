@@ -29,12 +29,20 @@ export class GenetiaClient {
   constructor(private readonly options: GenetiaClientOptions) { this.request = options.fetch ?? globalThis.fetch.bind(globalThis); }
   private async get<T>(path: string, schema: { parse(value: unknown): T }, extraHeaders: Record<string, string> = {}): Promise<T> {
     const r = await this.request(apiRequestUrl(this.options.baseUrl, path), { headers: { ...this.options.headers, ...extraHeaders } });
-    if (!r.ok) throw new Error(`${path} ${r.status}`);
+    if (!r.ok) {
+      const body = await r.json().catch(() => undefined) as { error?: unknown } | undefined;
+      const detail = typeof body?.error === "string" ? `: ${body.error}` : "";
+      throw new Error(`${path} ${r.status}${detail}`);
+    }
     return schema.parse(await r.json());
   }
   private async post<T>(path: string, body: unknown, schema: { parse(value: unknown): T }, extraHeaders: Record<string, string> = {}): Promise<T> {
     const r = await this.request(apiRequestUrl(this.options.baseUrl, path), { method: "POST", headers: { "content-type": "application/json", ...this.options.headers, ...extraHeaders }, body: JSON.stringify(body) });
-    if (!r.ok) throw new Error(`${path} ${r.status}`);
+    if (!r.ok) {
+      const body = await r.json().catch(() => undefined) as { error?: unknown } | undefined;
+      const detail = typeof body?.error === "string" ? `: ${body.error}` : "";
+      throw new Error(`${path} ${r.status}${detail}`);
+    }
     return schema.parse(await r.json());
   }
   async markets(params: { category?: string; engine?: "POOL" | "LMSR"; status?: "ACTIVE" | "RESOLVED"; search?: string; cursor?: string; limit?: number } = {}): Promise<MarketPage> {

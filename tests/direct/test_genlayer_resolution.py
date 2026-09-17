@@ -56,6 +56,22 @@ def test_admissibility_rejects_bad_timing_before_llm(direct_deploy, direct_vm):
         contract.assess("p2", json.dumps(bad))
 
 
+def test_multisource_admissibility_requires_two_distinct_sources(direct_deploy, direct_vm):
+    contract = direct_deploy("contracts/genlayer/market_admissibility.py", sdk_version="v0.6.0-rc3")
+    invalid = manifest(resolution_profile="MULTI_SOURCE", fallback_sources=[], minimum_corroborating_sources=2)
+    invalid["manifest_hash"] = manifest_hash(invalid)
+    with direct_vm.expect_revert("two distinct source URLs"):
+        contract.assess("single-source", json.dumps(invalid))
+    valid = manifest(resolution_profile="MULTI_SOURCE", minimum_corroborating_sources=2)
+    valid["authoritative_sources"] = [
+        {"identity": "league", "exact_url": "https://official.example/final", "source_type": "official", "priority": 0, "required": True},
+        {"identity": "federation", "exact_url": "https://federation.example/final", "source_type": "official", "priority": 1, "required": True},
+    ]
+    valid["manifest_hash"] = manifest_hash(valid)
+    direct_vm.mock_llm(r"Independently assess", json.dumps({"decision": "APPROVED", "issue_codes": []}))
+    assert contract.assess("two-source", json.dumps(valid)) == "APPROVED"
+
+
 def test_admissibility_accepts_an_explicitly_empty_fallback_list(direct_deploy, direct_vm):
     contract = direct_deploy("contracts/genlayer/market_admissibility.py", sdk_version="v0.6.0-rc3")
     data = manifest(fallback_sources=[])

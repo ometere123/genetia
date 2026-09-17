@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseAbi, type Address } from "viem";
 import { baseSepolia } from "viem/chains";
 import { GenetiaClient, MARKET_CATEGORIES, type MarketCategory, type Proposal } from "@genetia/sdk";
-import { getAccessToken, useWallets } from "@privy-io/react-auth";
+import { getAccessToken, useLogin, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useI18n } from "../i18n";
 
 const usdcAbi = parseAbi(["function approve(address spender, uint256 amount)"]);
@@ -17,24 +17,38 @@ export default function CreateMarketPage() {
   const [status, setStatus] = useState("");
   const [bondTx, setBondTx] = useState<string>();
   const { wallets } = useWallets();
+  const { authenticated, linkWallet } = usePrivy();
+  const { login } = useLogin();
   useEffect(() => {
     const sharedAddress = wallets[0]?.address as Address | undefined;
     if (sharedAddress && (!address || address.toLowerCase() !== sharedAddress.toLowerCase())) setAddress(sharedAddress);
   }, [address, wallets]);
 
   async function connect() {
+    if (!authenticated) {
+      login();
+      return;
+    }
     const selected = wallets[0];
-    if (!selected) return setStatus("Connect an embedded or external wallet with Privy first.");
+    if (!selected) {
+      linkWallet({ walletChainType: "ethereum-only" });
+      setStatus("Link your external wallet in the Privy dialog, then continue.");
+      return;
+    }
     if (selected.chainId !== `eip155:${baseSepolia.id}`) await selected.switchChain(baseSepolia.id);
     setAddress(selected.address as Address);
-    setStatus(`Connected ${selected.address.slice(0, 6)}…${selected.address.slice(-4)} on Base Sepolia.`);
+    setStatus(`Connected ${selected.address.slice(0, 6)}…${selected.address.slice(-4)} on Base Sepolia. If the API still reports an ownership error, use “Link external wallet” in the account menu once.`);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!address) return setStatus("Connect a wallet first.");
     const selected = wallets.find((wallet) => wallet.address.toLowerCase() === address.toLowerCase()) ?? wallets[0];
-    if (!selected) return setStatus("Connect an embedded or external wallet with Privy first.");
+    if (!selected) {
+      linkWallet({ walletChainType: "ethereum-only" });
+      setStatus("Link your external wallet in the Privy dialog, then continue.");
+      return;
+    }
     const form = new FormData(event.currentTarget);
     const close = Math.floor(new Date(String(form.get("closeTime"))).getTime() / 1000);
     const resolution = Math.floor(new Date(String(form.get("resolutionTime"))).getTime() / 1000);

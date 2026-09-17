@@ -5,7 +5,7 @@
   "proposalId": "connected-pool-d90484a88607c94c",
   "manifestHash": "0x7d16e34767cbf768f4b4c4f9f3a428396b116918dda063f3b46ecb76d4c9a50d",
   "assessmentStatus": "FINALIZED_SUCCESS",
-  "updatedAt": "2026-09-17T19:57:37.662Z",
+  "updatedAt": "2026-09-17T20:12:40.176Z",
   "assessmentTx": "0x3a8b2cdf1c10618f5a7dee07757d4a46e3dda8b56b65077ecd098b10f9ddcb1d",
   "assessmentSubmittedAt": "2026-09-17T19:08:15.589Z",
   "assessmentLastObservedStatus": "FINALIZED",
@@ -106,5 +106,36 @@
     "status": "REGISTERED"
   },
   "resolutionStatus": "WAITING_FOR_SCHEDULED_WINDOW",
-  "resolutionDueAt": 1789675702
+  "resolutionDueAt": 1789675702,
+  "resolveStatus": "FINALIZED_SUCCESS",
+  "resolveAttempt": 0,
+  "resolveFeeEstimateMode": "network-estimate-after-stale-simulation-clock",
+  "resolveTx": "0xbf0c809c059c8bf869e925587843977f1251314b79daaf3fab97d0c56080182f",
+  "resolveSubmittedAt": "2026-09-17T20:11:34.558Z",
+  "resolveLastObservedStatus": "FINALIZED",
+  "resolveLastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolveExecution": "FINISHED_WITH_RETURN",
+  "attemptRecord": {
+    "attempt": 0,
+    "evidence": [
+      {
+        "content_hash": "13f5e50297bde87abbf51cd1cd43678109b1a72a52c1cefa3b56844464e4f25c",
+        "identity": "example-domain",
+        "url": "https://example.com/"
+      }
+    ],
+    "evidence_commitment": "0x597fdc947cd85dbd04f610e578ec3c30fd7599cd3b5ef1b81455edde4682326a",
+    "facts": [
+      "The YES definition requires the page to display the heading 'Example Domain', which is satisfied by the evidence.",
+      "The content of the page displays the text 'Example Domain' as its primary heading.",
+      "The locked source at https://example.com/ was successfully retrieved."
+    ],
+    "manifest_hash": "0x7d16e34767cbf768f4b4c4f9f3a428396b116918dda063f3b46ecb76d4c9a50d",
+    "outcome": "YES",
+    "result_commitment": "0x1a3ac6ac4825104cf12c47fb9f4a3d078e204ee460eac005337887474ac1ac3d",
+    "used_sources": [
+      "example-domain"
+    ]
+  },
+  "resultCommitment": "0x1a3ac6ac4825104cf12c47fb9f4a3d078e204ee460eac005337887474ac1ac3d"
 }

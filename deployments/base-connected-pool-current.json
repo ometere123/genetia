@@ -1,6 +1,6 @@
 {
   "createTx": "0x1f829a9afbeb3876a3e67c036be16ba0111218958213df2cacf0a689cbe74146",
-  "updatedAt": "2026-09-17T19:14:21.902Z",
+  "updatedAt": "2026-09-17T20:15:17.061Z",
   "market": "0x3B0795F7b57244AD2Cad7668451efccb1f6b798d",
   "marketId": "0xd90484a88607c94cfd9d414c276418499c5833fb5a0390091f014a1830fde319",
   "predictedMarket": "0x3B0795F7b57244AD2Cad7668451efccb1f6b798d",
@@ -18,5 +18,17 @@
   "closeTime": 1789675642,
   "resolutionAvailableTime": 1789675702,
   "terminalDeadline": 1790021302,
-  "lastBaseBlock": "46952088"
+  "lastBaseBlock": "46952088",
+  "watcherQuorum": [
+    "0xe11517D09A5960cA63F078fBA03D59c4E3cAd4c2",
+    "0x93811A25A926347dF76fC04f802c0388FC489744",
+    "0xFB36E94EE0aF65EFeC4DAE418a2C6e03000d1f7c"
+  ],
+  "resolutionTx": "0xbf0c809c059c8bf869e925587843977f1251314b79daaf3fab97d0c56080182f",
+  "settlementTx": "0x32efc6fa38b05a63b7c653f11eb6dfc5eda9ae8ce0d4798f54fc77a8de8c839a",
+  "settlementStatus": "CONFIRMED",
+  "claimTx": "0x9fb1e33c9ce1443fa4faf9b8adca9e8f14f865292814ad9b285866a9e993f28b",
+  "claimStatus": "CONFIRMED",
+  "settledOutcome": "YES",
+  "claimableAfter": "0"
 }

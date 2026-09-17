@@ -1,0 +1,10 @@
+.pytest_cache/
+.next/
+**/.next/
+node_modules/
+**/node_modules/
+*.env
+*.dev.vars
+.git/
+genetia_fresh_start_handoff/
+*.log

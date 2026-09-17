@@ -1,0 +1,22 @@
+{
+  "createTx": "0x1f829a9afbeb3876a3e67c036be16ba0111218958213df2cacf0a689cbe74146",
+  "updatedAt": "2026-09-17T19:14:21.902Z",
+  "market": "0x3B0795F7b57244AD2Cad7668451efccb1f6b798d",
+  "marketId": "0xd90484a88607c94cfd9d414c276418499c5833fb5a0390091f014a1830fde319",
+  "predictedMarket": "0x3B0795F7b57244AD2Cad7668451efccb1f6b798d",
+  "manifestHash": "0x7d16e34767cbf768f4b4c4f9f3a428396b116918dda063f3b46ecb76d4c9a50d",
+  "resolver": "0x17107DF5172Ea21991742345b5375b6d1c1397a5",
+  "resolverReleaseId": "0x78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
+  "chainId": 84532,
+  "status": "FUNDED_BOTH_SIDES",
+  "approvalTx": "0x6eb152ccc34c5567c49014953f0e6e2788d7657f54a10b5d191e197ea9169faa",
+  "yesStakeTx": "0x61d8dc1ce1dbbc4ef18fabcb9052609eafcde19f61141b0e63d480adfd3f5947",
+  "noStakeTx": "0xb136c7df8d0484408a6ba3787ee7afc3586e7cc2011fcff616584582a2af3a6f",
+  "yesTotal": "4000000",
+  "noTotal": "4000000",
+  "usdcAfter": "139.870008",
+  "closeTime": 1789675642,
+  "resolutionAvailableTime": 1789675702,
+  "terminalDeadline": 1790021302,
+  "lastBaseBlock": "46952088"
+}

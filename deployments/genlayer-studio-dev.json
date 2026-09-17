@@ -2,7 +2,7 @@
   "chainId": 61997,
   "environment": "studio-dev",
   "rpc": "https://studio-dev.genlayer.com/api",
-  "activeRelease": "market-admissibility-20260912-ef2690c9",
+  "activeRelease": "market-admissibility-20260917-70ebad3b",
   "releases": [
     {
       "releaseId": "market-admissibility-20260910-fa0ca307",
@@ -64,7 +64,7 @@
     },
     {
       "releaseId": "market-admissibility-20260912-ef2690c9",
-      "status": "CANONICAL",
+      "status": "SUPERSEDED_FOR_NEW_PROPOSALS",
       "address": "0x2C0d57182cb4860AC03252181e5a908747111A36",
       "deploymentTx": "0x2e7c2391258ef2f7d5aa6b899700566abf38a8e3e64b4db7c3e4214a345f9fdb",
       "sourceSha256": "ef2690c912820fa27af0bc01ae16057d6647bf9d2337eee56d3952a58e93c615",
@@ -84,6 +84,30 @@
       "readVariant": "LATEST_FINAL",
       "deploymentSourceMatch": true,
       "assessmentExecution": "FINISHED_WITH_RETURN"
+    },
+    {
+      "releaseId": "market-admissibility-20260917-70ebad3b",
+      "status": "CANONICAL",
+      "address": "0x8DeD1d978f70E321ADce704aF95a50314A225757",
+      "deploymentTx": "0x6381a2953de26efdcc3e488c3c668462df804e044cc85fbece3218c1aac58e1f",
+      "sourceSha256": "70ebad3b6f5a69b63c2fd1554960a2bcd84c394217370ae99678eccaf15f7cb7",
+      "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+      "execution": "FINISHED_WITH_RETURN",
+      "statusName": "FINALIZED",
+      "methods": [
+        "assess",
+        "get_assessment"
+      ],
+      "verifiedAssessTx": "0xc30302ac75b382fca1a110c0cc9abda9424bf5efd05a97d797a725449e7ac9ed",
+      "verifiedProposalId": "besiktas-marseille-2026-09-17",
+      "verifiedAssessment": {
+        "decision": "APPROVED",
+        "issue_codes": []
+      },
+      "readVariant": "LATEST_FINAL",
+      "deploymentSourceMatch": true,
+      "assessmentExecution": "FINISHED_WITH_RETURN",
+      "supersedes": "market-admissibility-20260912-ef2690c9"
     }
   ],
   "sdkVersion": "2.0.0-rc.1",
@@ -92,13 +116,13 @@
   "genvmVersion": "v0.3.0-rc7",
   "sharedContracts": {
     "resolverFactory": {
-      "releaseId": "resolver-factory-20260912-daf2557c-child-891034a5",
+      "releaseId": "resolver-factory-20260917-09123e42-child-78edfc1d",
       "status": "CANONICAL",
-      "address": "0x21e729aD74893bEa2f20451650235466bDEb9520",
-      "deploymentTx": "0x8fce0fb288adc7831ac360eefea6ffc75d4001f2b7015a4e318307ae837adb55",
-      "sourceSha256": "daf2557c84560f67184ad0c2f2af0cf8873797292f94c5e386d2bba956f9d84c",
-      "childSourceSha256": "891034a5773f6dcad070f14a82ed741d982e2ff1b8dd8458c601aaf18049a481",
-      "childResolverReleaseId": "0x891034a5773f6dcad070f14a82ed741d982e2ff1b8dd8458c601aaf18049a481",
+      "address": "0xFD5B0cAB50Ad7B0d20aaeAebc6F01D5e15441d32",
+      "deploymentTx": "0xd58fcb65e76da973590591a19960cb651d7be2139a8f783b59c7c51ba21368e4",
+      "sourceSha256": "09123e42aca42864046e5a1e775a921a6253adef1b4f0cd4e81aa198d69f2b89",
+      "childSourceSha256": "78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
+      "childResolverReleaseId": "0x78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
       "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
       "execution": "FINISHED_WITH_RETURN",
       "statusName": "FINALIZED",
@@ -109,7 +133,7 @@
       ],
       "deployedSourceMatch": true,
       "schemaVerified": true,
-      "supersedes": "resolver-factory-20260912-daf2557c-contract-deploy-api"
+      "supersedes": "resolver-factory-20260912-daf2557c-child-891034a5"
     },
     "resolverFactoryHistory": [
       {
@@ -163,8 +187,28 @@
         "deployedSourceMatch": true,
         "schemaVerified": true,
         "supersedes": "resolver-factory-20260912-2b9df1d9-deterministic-market-salt"
+      },
+      {
+        "releaseId": "resolver-factory-20260912-daf2557c-child-891034a5",
+        "status": "SUPERSEDED_FOR_NEW_RESOLVERS",
+        "address": "0x21e729aD74893bEa2f20451650235466bDEb9520",
+        "deploymentTx": "0x8fce0fb288adc7831ac360eefea6ffc75d4001f2b7015a4e318307ae837adb55",
+        "sourceSha256": "daf2557c84560f67184ad0c2f2af0cf8873797292f94c5e386d2bba956f9d84c",
+        "childSourceSha256": "891034a5773f6dcad070f14a82ed741d982e2ff1b8dd8458c601aaf18049a481",
+        "childResolverReleaseId": "0x891034a5773f6dcad070f14a82ed741d982e2ff1b8dd8458c601aaf18049a481",
+        "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+        "execution": "FINISHED_WITH_RETURN",
+        "statusName": "FINALIZED",
+        "resultName": "MAJORITY_AGREE",
+        "methods": [
+          "deploy_resolver",
+          "get_resolver"
+        ],
+        "deployedSourceMatch": true,
+        "schemaVerified": true,
+        "supersedes": "resolver-factory-20260912-daf2557c-contract-deploy-api"
       }
     ]
   },
-  "commitSha": "e3920a5b652f2cb107daa9de64c04e6afd3f09d3"
+  "commitSha": "062e1c9b8f7271acac245235088863a64d60eaec"
 }

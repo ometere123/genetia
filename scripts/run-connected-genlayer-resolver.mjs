@@ -77,7 +77,7 @@ const manifestText = canonical(manifest);
 const hash = `0x${crypto.createHash("sha256").update(Buffer.from(canonical(Object.fromEntries(Object.entries(manifest).filter(([k]) => k !== "manifest_hash"))), "utf8")).digest("hex")}`;
 if (hash !== manifest.manifest_hash) throw new Error("fixture manifest hash mismatch");
 const client = createClient({ chain: studioDevnet, endpoint: "https://studio-dev.genlayer.com/api", account: createAccount(key) });
-const maAddress = "0x2C0d57182cb4860AC03252181e5a908747111A36";
+const maAddress = process.env.STUDIO_ADMISSIBILITY_ADDRESS || "0x8DeD1d978f70E321ADce704aF95a50314A225757";
 const registry = JSON.parse(fs.readFileSync(path.join(root, "deployments/genlayer-studio-dev.json"), "utf8"));
 const factoryAddress = registry.sharedContracts?.resolverFactory?.address;
 if (!factoryAddress || registry.sharedContracts.resolverFactory.status !== "CANONICAL") throw new Error("canonical ResolverFactory release is missing");

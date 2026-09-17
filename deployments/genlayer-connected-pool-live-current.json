@@ -1,0 +1,110 @@
+{
+  "network": "studio-dev",
+  "chainId": 61997,
+  "marketId": "0xd90484a88607c94cfd9d414c276418499c5833fb5a0390091f014a1830fde319",
+  "proposalId": "connected-pool-d90484a88607c94c",
+  "manifestHash": "0x7d16e34767cbf768f4b4c4f9f3a428396b116918dda063f3b46ecb76d4c9a50d",
+  "assessmentStatus": "FINALIZED_SUCCESS",
+  "updatedAt": "2026-09-17T19:11:02.084Z",
+  "assessmentTx": "0x3a8b2cdf1c10618f5a7dee07757d4a46e3dda8b56b65077ecd098b10f9ddcb1d",
+  "assessmentSubmittedAt": "2026-09-17T19:08:15.589Z",
+  "assessmentLastObservedStatus": "FINALIZED",
+  "assessmentLastObservedExecution": "FINISHED_WITH_RETURN",
+  "assessmentExecution": "FINISHED_WITH_RETURN",
+  "assessmentReturnVerification": "SDK transaction endpoint does not expose method return; verified deployed source returns the same decision variable stored in LATEST_FINAL state",
+  "assessment": {
+    "decision": "APPROVED",
+    "issue_codes": []
+  },
+  "finalizedAssessmentState": "LATEST_FINAL",
+  "resolverFactoryAddress": "0xFD5B0cAB50Ad7B0d20aaeAebc6F01D5e15441d32",
+  "factoryAttempts": [],
+  "resolverFactoryTxStatus": "FINALIZED_SUCCESS",
+  "resolverFactoryTx": "0x3cc4103dd67c1199322f70df34539532fbc75e49dc30d8abe5e4619eabfbc2a5",
+  "factoryFeeEstimateMode": "method-simulation",
+  "resolverFactorySubmittedAt": "2026-09-17T19:09:23.853Z",
+  "factoryLastObservedStatus": "FINALIZED",
+  "factoryLastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolverFactoryExecution": "FINISHED_WITH_RETURN",
+  "triggeredTxs": [
+    "0x8cd53188311b986e1a9262aa470373f10ce46dfc2d20cf6a972945998a052b40"
+  ],
+  "child-8cd53188LastObservedStatus": "FINALIZED",
+  "child-8cd53188LastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolverAddress": "0x17107DF5172Ea21991742345b5375b6d1c1397a5",
+  "resolverStatus": "FINALIZED_SUCCESS",
+  "childFinality": [
+    {
+      "tx": "0x8cd53188311b986e1a9262aa470373f10ce46dfc2d20cf6a972945998a052b40",
+      "status": "FINALIZED",
+      "execution": "FINISHED_WITH_RETURN"
+    }
+  ],
+  "resolverSourceSha256": "78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
+  "intendedResolverSha256": "78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
+  "resolverCodeMatches": true,
+  "resolverSchema": {
+    "ctor": {
+      "params": [
+        [
+          "locked_manifest",
+          "string"
+        ],
+        [
+          "locked_hash",
+          "string"
+        ],
+        [
+          "release_id",
+          "string"
+        ]
+      ],
+      "kwparams": {}
+    },
+    "methods": {
+      "get_attempt": {
+        "params": [
+          [
+            "attempt_number",
+            "int"
+          ]
+        ],
+        "kwparams": {},
+        "readonly": true,
+        "ret": "string"
+      },
+      "get_binding_state": {
+        "params": [],
+        "kwparams": {},
+        "readonly": true,
+        "ret": "string"
+      },
+      "resolve": {
+        "params": [
+          [
+            "market_id",
+            "string"
+          ],
+          [
+            "attempt_number",
+            "int"
+          ]
+        ],
+        "kwparams": {},
+        "readonly": false,
+        "ret": "string",
+        "payable": false
+      }
+    }
+  },
+  "binding": {
+    "base_market": "0x3B0795F7b57244AD2Cad7668451efccb1f6b798d",
+    "last_result": "UNRESOLVED",
+    "manifest_hash": "0x7d16e34767cbf768f4b4c4f9f3a428396b116918dda063f3b46ecb76d4c9a50d",
+    "market_id": "0xd90484a88607c94cfd9d414c276418499c5833fb5a0390091f014a1830fde319",
+    "resolver_release_id": "0x78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
+    "status": "REGISTERED"
+  },
+  "resolutionStatus": "WAITING_FOR_SCHEDULED_WINDOW",
+  "resolutionDueAt": 1789675702
+}

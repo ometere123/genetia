@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseAbi, type Address } from "viem";
 import { baseSepolia } from "viem/chains";
@@ -17,6 +17,10 @@ export default function CreateMarketPage() {
   const [status, setStatus] = useState("");
   const [bondTx, setBondTx] = useState<string>();
   const { wallets } = useWallets();
+  useEffect(() => {
+    const sharedAddress = wallets[0]?.address as Address | undefined;
+    if (sharedAddress && (!address || address.toLowerCase() !== sharedAddress.toLowerCase())) setAddress(sharedAddress);
+  }, [address, wallets]);
 
   async function connect() {
     const selected = wallets[0];
@@ -41,8 +45,8 @@ export default function CreateMarketPage() {
       question: String(form.get("question")), yes_definition: String(form.get("yesDefinition")), no_definition: String(form.get("noDefinition")),
       close_time: close, resolution_available_time: resolution, absolute_terminal_deadline: resolution + 345600,
       evidence_attempt_schedule_seconds: [0, 1800, 14400, 86400, 259200], void_conditions: ["insufficient authoritative evidence by terminal deadline"],
-      resolution_profile: "MULTI_SOURCE", authoritative_sources: [{ identity: "creator-declared source", exact_url: String(form.get("source")), source_type: "official", priority: 0, required: true }], fallback_sources: [],
-      corroboration_rule: "independent corroboration", minimum_corroborating_sources: 1, freshness_rule: "current at resolution", discovery_rule: "locked exact source or policy-compliant future page",
+      resolution_profile: "MULTI_SOURCE", authoritative_sources: [{ identity: "UEFA", exact_url: String(form.get("source")), source_type: "official", priority: 0, required: true }, { identity: "BJK_OFFICIAL", exact_url: String(form.get("corroboratingSource")), source_type: "official", priority: 1, required: true }], fallback_sources: [],
+      corroboration_rule: "two independent official sources must agree", minimum_corroborating_sources: 2, freshness_rule: "current at resolution", discovery_rule: "locked exact sources or policy-compliant future pages",
       official_source_required: true, arbitrary_caller_urls_forbidden: true, prompt_release_id: "pending", manifest_release_id: "pending", resolver_release_id: "pending", engine: String(form.get("engine")) as "POOL" | "LMSR",
       lmsrB: String(form.get("engine")) === "LMSR" ? "100000000" : undefined,
     };
@@ -87,7 +91,7 @@ export default function CreateMarketPage() {
           </section>
           <section className="space-y-4 border-t border-border pt-6"><div><h2 className="text-sm font-semibold text-slate-100">{t("create.setup")}</h2><p className="mt-1 text-xs text-slate-500">{t("create.setupHelp")}</p></div>
             <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>{t("create.category")}<select name="category" className={fieldClass}>{MARKET_CATEGORIES.map((category) => <option key={category} value={category}>{t(`category.${category}`)}</option>)}</select></label><label className={labelClass}>{t("create.engine")}<select name="engine" className={fieldClass}><option value="POOL">{t("create.poolEngine")}</option><option value="LMSR">{t("create.lmsrEngine")}</option></select></label></div>
-            <label className={labelClass}>{t("create.source")}<input required type="url" name="source" placeholder="https://…" className={fieldClass} /></label>
+            <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>{t("create.source")}<input required type="url" name="source" placeholder="https:// UEFA match centre…" className={fieldClass} /></label><label className={labelClass}>Independent corroborating source<input required type="url" name="corroboratingSource" placeholder="https:// official club match centre…" className={fieldClass} /></label></div>
             <div className="grid gap-4 sm:grid-cols-2"><label className={labelClass}>{t("create.closeTime")}<input required type="datetime-local" name="closeTime" className={fieldClass} /></label><label className={labelClass}>{t("create.resolutionTime")}<input required type="datetime-local" name="resolutionTime" className={fieldClass} /></label></div>
           </section>
           <section className="rounded-2xl border border-brand/25 bg-brand-muted/40 p-4 sm:p-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand-light" aria-hidden="true">◈</span><div><h2 className="text-sm font-semibold text-white">{t("create.bondTitle")}</h2><p className="mt-1 text-xs leading-5 text-slate-400">{t("create.bondBody")}</p></div></div></section>

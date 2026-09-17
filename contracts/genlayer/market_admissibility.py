@@ -80,6 +80,12 @@ class MarketAdmissibility(gl.contract.Contract):
         if data.get("base_chain_id") != 84532 or data.get("genlayer_chain_id") != 61997: raise gl.vm.UserError("[EXPECTED] wrong chain binding")
         if data.get("resolution_profile") not in PROFILES: raise gl.vm.UserError("[EXPECTED] invalid resolution profile")
         if data.get("arbitrary_caller_urls_forbidden") is not True: raise gl.vm.UserError("[EXPECTED] caller source injection must be forbidden")
+        if data.get("resolution_profile") == "MULTI_SOURCE":
+            sources = data.get("authoritative_sources", []) + data.get("fallback_sources", [])
+            urls = [str(source.get("exact_url", "")) for source in sources if isinstance(source, dict)]
+            identities = [str(source.get("identity", "")) for source in sources if isinstance(source, dict)]
+            if len(urls) < 2 or len(set(urls)) < 2 or len(set(identities)) < 2: raise gl.vm.UserError("[EXPECTED] MULTI_SOURCE requires two distinct source URLs and identities")
+            if int(data.get("minimum_corroborating_sources", 0)) < 2: raise gl.vm.UserError("[EXPECTED] MULTI_SOURCE requires two corroborating sources")
         if data.get("resolution_available_time") < data.get("close_time"): raise gl.vm.UserError("[EXPECTED] resolution precedes close")
         if data.get("absolute_terminal_deadline") != data.get("resolution_available_time") + 345600: raise gl.vm.UserError("[EXPECTED] terminal deadline must be +96h")
         canonical_body = json.dumps({key: value for key, value in data.items() if key != "manifest_hash"}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

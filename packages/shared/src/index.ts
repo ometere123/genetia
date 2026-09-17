@@ -59,7 +59,7 @@ const ResolutionManifestBase = z.object({
   arbitrary_caller_urls_forbidden: z.literal(true), prompt_release_id: z.string().min(1), manifest_release_id: z.string().min(1),
   resolver_release_id: z.string().min(1), manifest_hash: HashSchema,
 });
-export const ResolutionManifestSchema = ResolutionManifestBase.refine((manifest) => manifest.absolute_terminal_deadline === manifest.resolution_available_time + 345600, "terminal deadline must be resolution availability plus 96 hours");
+export const ResolutionManifestSchema = ResolutionManifestBase.refine((manifest) => manifest.absolute_terminal_deadline === manifest.resolution_available_time + 345600, "terminal deadline must be resolution availability plus 96 hours").refine((manifest) => manifest.resolution_profile !== "MULTI_SOURCE" || new Set([...manifest.authoritative_sources, ...manifest.fallback_sources].map((source) => source.exact_url)).size >= 2, "MULTI_SOURCE manifests require two distinct source URLs");
 
 export const MarketSchema = z.object({
   id: z.string(), marketId: z.string(), engine: EngineSchema, title: z.string(), question: z.string(), description: z.string(),
@@ -91,7 +91,7 @@ export const QuoteSchema = z.object({
   feeRateBps: z.number().int().nonnegative().optional(), quoteAt: AmountSchema.optional(),
 });
 export const TransactionPreparationSchema = z.object({ chainId: z.literal(84532), to: AddressSchema, data: z.string().regex(/^0x[a-fA-F0-9]*$/), value: z.literal("0"), marketId: z.string().min(1), engine: EngineSchema, action: z.enum(["BUY", "SELL"]), side: z.enum(["YES", "NO"]), amount: AmountSchema, approval: z.object({ token: AddressSchema, spender: AddressSchema, amount: AmountSchema }).nullable() });
-export const ProposalSchema = ResolutionManifestBase.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, category: MarketCategorySchema.optional(), lmsrB: AmountSchema.optional() });
+export const ProposalSchema = ResolutionManifestBase.omit({ base_market_address: true, manifest_hash: true }).extend({ idempotencyKey: z.string().min(16), engine: EngineSchema, category: MarketCategorySchema.optional(), lmsrB: AmountSchema.optional() }).refine((proposal) => proposal.resolution_profile !== "MULTI_SOURCE" || new Set([...proposal.authoritative_sources, ...proposal.fallback_sources].map((source) => source.exact_url)).size >= 2, "MULTI_SOURCE proposals require two distinct source URLs");
 export const ProposalBondPreparationSchema = z.object({
   chainId: z.literal(84532),
   proposalId: HashSchema,

@@ -7,8 +7,8 @@ const proposal: Proposal = {
   question: "Will this proposal resolve?", yes_definition: "YES when official result confirms it.", no_definition: "NO otherwise under policy.",
   close_time: 1900000000, resolution_available_time: 1900003600, absolute_terminal_deadline: 1900349200,
   evidence_attempt_schedule_seconds: [0, 1800, 14400, 86400, 259200], void_conditions: ["insufficient evidence"], resolution_profile: "MULTI_SOURCE",
-  authoritative_sources: [{ identity: "official", exact_url: "https://example.com/result", source_type: "official", priority: 0, required: true }], fallback_sources: [],
-  corroboration_rule: "one source", minimum_corroborating_sources: 1, freshness_rule: "current", discovery_rule: "exact URL", official_source_required: true,
+  authoritative_sources: [{ identity: "official", exact_url: "https://example.com/result", source_type: "official", priority: 0, required: true }, { identity: "corroborating", exact_url: "https://example.com/corroborating", source_type: "official", priority: 1, required: true }], fallback_sources: [],
+  corroboration_rule: "two independent official sources must agree", minimum_corroborating_sources: 2, freshness_rule: "current", discovery_rule: "exact URL", official_source_required: true,
   arbitrary_caller_urls_forbidden: true, prompt_release_id: "prompt-a", manifest_release_id: "manifest-a", resolver_release_id: "resolver-a", engine: "POOL",
 };
 const proposer = `0x${"11".repeat(20)}` as `0x${string}`;

@@ -5,7 +5,7 @@
   "proposalId": "connected-pool-d90484a88607c94c",
   "manifestHash": "0x7d16e34767cbf768f4b4c4f9f3a428396b116918dda063f3b46ecb76d4c9a50d",
   "assessmentStatus": "FINALIZED_SUCCESS",
-  "updatedAt": "2026-09-17T19:11:02.084Z",
+  "updatedAt": "2026-09-17T19:57:37.662Z",
   "assessmentTx": "0x3a8b2cdf1c10618f5a7dee07757d4a46e3dda8b56b65077ecd098b10f9ddcb1d",
   "assessmentSubmittedAt": "2026-09-17T19:08:15.589Z",
   "assessmentLastObservedStatus": "FINALIZED",

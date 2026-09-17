@@ -5,7 +5,7 @@
   "proposalId": "connected-lmsr-80d59225b63160f3",
   "manifestHash": "0xe9033eedc25e20c2377a18ae5d383517bb5e3acaaa2666d7845ee63cfba560d1",
   "assessmentStatus": "FINALIZED_SUCCESS",
-  "updatedAt": "2026-09-17T19:20:29.275Z",
+  "updatedAt": "2026-09-17T19:54:50.243Z",
   "assessmentTx": "0xb66beca6ddb46dc744338abee7149b97f3a6b20f8d2781271156a050f87941f0",
   "assessmentSubmittedAt": "2026-09-17T19:18:03.530Z",
   "assessmentLastObservedStatus": "FINALIZED",
@@ -99,12 +99,43 @@
   },
   "binding": {
     "base_market": "0xc462D8D686375b27022267fDeA10acbd0FdD1616",
-    "last_result": "UNRESOLVED",
+    "last_result": "YES",
     "manifest_hash": "0xe9033eedc25e20c2377a18ae5d383517bb5e3acaaa2666d7845ee63cfba560d1",
     "market_id": "0x80d59225b63160f334da031fb482bf23e9476da04085913f68dbc2af7a987c95",
     "resolver_release_id": "0x78edfc1d49e2ad3fddb4e2392c5cfad6a722e33982f98614a071e896260450ac",
-    "status": "REGISTERED"
+    "status": "RESOLVED"
   },
   "resolutionStatus": "WAITING_FOR_SCHEDULED_WINDOW",
-  "resolutionDueAt": 1789674516
+  "resolutionDueAt": 1789674516,
+  "resolveStatus": "FINALIZED_SUCCESS",
+  "resolveAttempt": 0,
+  "resolveFeeEstimateMode": "network-estimate-after-stale-simulation-clock",
+  "resolveTx": "0xde8e2bfcef9737352412493f1f049ebdad13feeb9de5996d266b7231a283c63e",
+  "resolveSubmittedAt": "2026-09-17T19:53:28.968Z",
+  "resolveLastObservedStatus": "FINALIZED",
+  "resolveLastObservedExecution": "FINISHED_WITH_RETURN",
+  "resolveExecution": "FINISHED_WITH_RETURN",
+  "attemptRecord": {
+    "attempt": 0,
+    "evidence": [
+      {
+        "content_hash": "13f5e50297bde87abbf51cd1cd43678109b1a72a52c1cefa3b56844464e4f25c",
+        "identity": "example-domain",
+        "url": "https://example.com/"
+      }
+    ],
+    "evidence_commitment": "0x597fdc947cd85dbd04f610e578ec3c30fd7599cd3b5ef1b81455edde4682326a",
+    "facts": [
+      "According to the yes_definition, the presence of the heading 'Example Domain' on the locked page warrants a YES outcome.",
+      "The content of the source contains the exact canonical heading 'Example Domain'.",
+      "The locked source 'example-domain' was available and its content was retrieved."
+    ],
+    "manifest_hash": "0xe9033eedc25e20c2377a18ae5d383517bb5e3acaaa2666d7845ee63cfba560d1",
+    "outcome": "YES",
+    "result_commitment": "0xd9bbddbd0c646c26a11c3ae2f564235ea3df44e0bdee67eb1d095d239f45e572",
+    "used_sources": [
+      "example-domain"
+    ]
+  },
+  "resultCommitment": "0xd9bbddbd0c646c26a11c3ae2f564235ea3df44e0bdee67eb1d095d239f45e572"
 }

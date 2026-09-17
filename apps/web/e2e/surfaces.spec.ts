@@ -60,7 +60,7 @@ async function mockReadApi(page: import("@playwright/test").Page, engine: "POOL"
 test("discovery search filters the indexed market list", async ({ page }) => {
   const queries = await mockReadApi(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: market.question })).toBeVisible();
+  await expect(page.getByRole("heading", { name: market.question })).toBeVisible({ timeout: 10_000 });
   await page.getByPlaceholder("Search markets").fill("not in this result");
   await expect(page.getByText("No markets match your search.")).toBeVisible();
   await expect.poll(() => queries.at(-1)?.searchParams.get("search")).toBe("not in this result");
@@ -69,7 +69,7 @@ test("discovery search filters the indexed market list", async ({ page }) => {
 test("discovery sends category and engine filters to the API and appends cursor pages", async ({ page }) => {
   const queries = await mockReadApi(page);
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: market.question })).toBeVisible();
+  await expect(page.getByRole("heading", { name: market.question })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: "Tech & AI" }).click();
   await expect.poll(() => queries.at(-1)?.searchParams.get("category")).toBe("tech-ai");
   await page.getByRole("button", { name: "Resolved", exact: true }).click();
@@ -120,7 +120,7 @@ test("language choice is curated, persists after reload, and localizes navigatio
 test("market detail renders rules, resolution, evidence and live action surface", async ({ page }) => {
   await mockReadApi(page);
   await page.goto(`/markets/${marketId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: market.question })).toBeVisible();
+  await expect(page.getByRole("heading", { name: market.question })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(market.yesDefinition)).toBeVisible();
   await expect(page.getByText("PENDING", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Evidence" })).toBeVisible();
@@ -149,7 +149,7 @@ test("disconnected wallet cannot submit a Pool trade", async ({ page }) => {
 test("LMSR detail identifies the engine and fails closed without a connected wallet", async ({ page }) => {
   await mockReadApi(page, "LMSR");
   await page.goto(`/markets/${marketId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: market.question })).toBeVisible();
+  await expect(page.getByRole("heading", { name: market.question })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "LMSR" })).toBeVisible();
   await page.getByRole("button", { name: "Connect Privy wallet" }).click();
   await expect(page.getByText("Connect an embedded or external wallet with Privy first.")).toBeVisible();

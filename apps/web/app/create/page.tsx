@@ -17,12 +17,16 @@ export default function CreateMarketPage() {
   const [status, setStatus] = useState("");
   const [bondTx, setBondTx] = useState<string>();
   const { wallets } = useWallets();
-  const { authenticated, linkWallet } = usePrivy();
+  const { authenticated, user, linkWallet } = usePrivy();
   const { login } = useLogin();
   useEffect(() => {
     const sharedAddress = wallets[0]?.address as Address | undefined;
     if (sharedAddress && (!address || address.toLowerCase() !== sharedAddress.toLowerCase())) setAddress(sharedAddress);
   }, [address, wallets]);
+
+  function isLinked(addressToCheck: string): boolean {
+    return (user?.linkedAccounts ?? []).some((account) => account.type === "wallet" && account.address?.toLowerCase() === addressToCheck.toLowerCase());
+  }
 
   async function connect() {
     if (!authenticated) {
@@ -37,7 +41,12 @@ export default function CreateMarketPage() {
     }
     if (selected.chainId !== `eip155:${baseSepolia.id}`) await selected.switchChain(baseSepolia.id);
     setAddress(selected.address as Address);
-    setStatus(`Connected ${selected.address.slice(0, 6)}…${selected.address.slice(-4)} on Base Sepolia. If the API still reports an ownership error, use “Link external wallet” in the account menu once.`);
+    if (!isLinked(selected.address)) {
+      linkWallet({ walletChainType: "ethereum-only" });
+      setStatus("Wallet connected. Confirm the external-wallet link in the Privy dialog, then click this button again.");
+      return;
+    }
+    setStatus(`Wallet ${selected.address.slice(0, 6)}…${selected.address.slice(-4)} is linked on Base Sepolia.`);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -47,6 +56,11 @@ export default function CreateMarketPage() {
     if (!selected) {
       linkWallet({ walletChainType: "ethereum-only" });
       setStatus("Link your external wallet in the Privy dialog, then continue.");
+      return;
+    }
+    if (!isLinked(selected.address)) {
+      linkWallet({ walletChainType: "ethereum-only" });
+      setStatus("Link this external wallet in the Privy dialog, then submit again.");
       return;
     }
     const form = new FormData(event.currentTarget);

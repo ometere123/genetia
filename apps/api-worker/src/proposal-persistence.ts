@@ -12,9 +12,9 @@ type HyperdriveLike = { connectionString: string };
  */
 export async function persistVerifiedProposal(
   client: Queryable,
-  input: { proposal: Proposal; proposer: `0x${string}`; bondTxHash: `0x${string}`; receipt: BondReceipt },
+  input: { proposal: Proposal; proposer: `0x${string}`; bondTxHash: `0x${string}`; receipt: BondReceipt; proposalIdOverride?: `0x${string}` },
 ) {
-  const proposalId = await canonicalProposalId(input.proposal, input.proposer);
+  const proposalId = input.proposalIdOverride ?? await canonicalProposalId(input.proposal, input.proposer);
   const canonicalHash = proposalId;
   await client.query("BEGIN");
   try {

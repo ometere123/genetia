@@ -32,7 +32,28 @@ export async function prepareProposalBond(
 }
 
 export type BondReceiptLog = { address: string; topics: readonly `0x${string}`[]; data: `0x${string}` };
-export type BondReceipt = { status: "success" | "reverted"; to: string | null; logs: readonly BondReceiptLog[] };
+export type BondReceipt = { status: "success" | "reverted"; to: string | null; logs: readonly BondReceiptLog[] };export function bondProposalIdFromReceipt(receipt: BondReceipt, expected: { proposer: `0x${string}`; escrow: `0x${string}`; usdc: `0x${string}` }): `0x${string}` {
+  if (receipt.status !== "success") throw new Error("bond transaction failed");
+  if (!receipt.to || receipt.to.toLowerCase() !== expected.escrow.toLowerCase()) throw new Error("bond escrow mismatch");
+  let proposalId: `0x${string}` | undefined;
+  let transferred = false;
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() === expected.escrow.toLowerCase()) {
+      try {
+        const decoded = decodeEventLog({ abi: escrowAbi, data: log.data, topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]] });
+        if (decoded.eventName === "BondLocked" && decoded.args.proposer.toLowerCase() === expected.proposer.toLowerCase()) proposalId = decoded.args.proposalId as `0x${string}`;
+      } catch { /* unrelated log */ }
+    }
+    if (log.address.toLowerCase() === expected.usdc.toLowerCase()) {
+      try {
+        const decoded = decodeEventLog({ abi: erc20Abi, data: log.data, topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]] });
+        if (decoded.eventName === "Transfer" && decoded.args.from.toLowerCase() === expected.proposer.toLowerCase() && decoded.args.to.toLowerCase() === expected.escrow.toLowerCase() && decoded.args.value === PROPOSAL_BOND) transferred = true;
+      } catch { /* unrelated log */ }
+    }
+  }
+  if (!proposalId || !transferred) throw new Error("canonical proposal bond event not found");
+  return proposalId;
+}
 
 export function verifyBondReceipt(receipt: BondReceipt, expected: { proposalId: `0x${string}`; proposer: `0x${string}`; escrow: `0x${string}`; usdc: `0x${string}` }): void {
   if (receipt.status !== "success") throw new Error("bond transaction failed");

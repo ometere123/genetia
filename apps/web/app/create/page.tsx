@@ -82,7 +82,14 @@ export default function CreateMarketPage() {
       setStatus("Preparing the exact 2 USDC bond transaction…");
       const accessToken = await getAccessToken();
       if (!accessToken) throw new Error("Log in with Privy before creating a market.");
-      const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });
+      const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });      const recoveryTx = new URLSearchParams(window.location.search).get("recoverTx");
+      if (recoveryTx) {
+        if (!/^0x[0-9a-fA-F]{64}$/.test(recoveryTx)) throw new Error("Invalid recovery transaction hash.");
+        setStatus("Recovering the confirmed 2 USDC bond without another wallet transaction…");
+        const result = await api.submitProposal(proposal, recoveryTx as `0x${string}`, address);
+        router.push(`/create/status/${encodeURIComponent(result.proposalId)}`);
+        return;
+      }
       const prepared = await api.prepareProposalBond(proposal, address);
       const wallet = createWalletClient({ chain: baseSepolia, transport: custom(await selected.getEthereumProvider()) });
       const publicClient = createPublicClient({ chain: baseSepolia, transport: http(process.env.NEXT_PUBLIC_BASE_RPC ?? "https://base-sepolia-rpc.publicnode.com") });

@@ -8,13 +8,13 @@ import { liveQuote } from "./quote-adapter";
 import { prepareProposalBond } from "./proposal-adapter";
 import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
-import { canonicalProposalId, verifyBondReceipt } from "./proposal-adapter";
+import { canonicalProposalId, verifyBondReceipt, bondProposalIdFromReceipt } from "./proposal-adapter";
 import { createHyperdriveProposalPersistence } from "./proposal-persistence";
 import { syncPrivyWalletIdentity } from "./privy-identity";
 import { PrivyClient } from "@privy-io/node";
 import { Pool } from "pg";
 
-type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; WEB_ORIGINS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string };
+type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; WEB_ORIGINS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string; RECOVERY_BOND_TX_HASH?: string };
 type ReadModelFactory = (db: Hyperdrive) => MarketReadModel;
 type QuoteProvider = (market: unknown, request: QuoteRequest, rpcUrl: string) => Promise<Quote>;
 export type ProposalService = {
@@ -43,11 +43,14 @@ const defaultProposalService: ProposalService = {
     const client = createPublicClient({ chain: baseSepolia, transport: http(env.BASE_RPC) });
     if (await client.getChainId() !== 84532) throw new Error("Base chain mismatch");
     const receipt = await client.getTransactionReceipt({ hash: bondTxHash });
-    verifyBondReceipt(receipt, { proposalId: await canonicalProposalId(proposal, proposer), proposer, escrow: env.PROPOSAL_BOND_ESCROW as `0x${string}`, usdc: env.USDC_ADDRESS as `0x${string}` });
+    const recovery = Boolean(env.RECOVERY_BOND_TX_HASH && bondTxHash.toLowerCase() === env.RECOVERY_BOND_TX_HASH.toLowerCase());
+    const proposalId = recovery
+      ? bondProposalIdFromReceipt(receipt as never, { proposer, escrow: env.PROPOSAL_BOND_ESCROW as `0x${string}`, usdc: env.USDC_ADDRESS as `0x${string}` })
+      : await canonicalProposalId(proposal, proposer);
+    verifyBondReceipt(receipt, { proposalId, proposer, escrow: env.PROPOSAL_BOND_ESCROW as `0x${string}`, usdc: env.USDC_ADDRESS as `0x${string}` });
     if (!env.GENETIA_DB) throw new Error("bond verified; durable proposal database is not configured");
-    await createHyperdriveProposalPersistence(env.GENETIA_DB)({ proposal, proposer, bondTxHash, receipt: receipt as never });
+    await createHyperdriveProposalPersistence(env.GENETIA_DB)({ proposal, proposer, bondTxHash, receipt: receipt as never, proposalIdOverride: recovery ? proposalId : undefined });
     if (!env.GENETIA_JOBS) throw new Error("bond verified; durable proposal queue is not configured");
-    const proposalId = await canonicalProposalId(proposal, proposer);
     await env.GENETIA_JOBS.send({ kind: "market-admissibility", proposalId, idempotencyKey: `admissibility:${proposalId}` });
     return { proposalId, proposer, status: "ADMISSIBILITY_SUBMITTED", bondStatus: "CONFIRMED", revisionCount: 0, workflowStatus: "RUNNING" };
   },

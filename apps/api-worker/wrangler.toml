@@ -5,6 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 BASE_CHAIN_ID = "84532"
 BASE_RPC = "https://base-sepolia-rpc.publicnode.com"
+RECOVERY_BOND_TX_HASH = "0x7b4dbe380885e30b027307092bc01e4d902235a62808e3aa73dc849f8793d084"
 GENLAYER_CHAIN_ID = "61997"
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"

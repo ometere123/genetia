@@ -36,7 +36,7 @@ export async function persistVerifiedProposal(
     );
     await client.query(
       `INSERT INTO "genetia_app"."WorkflowState" ("idempotencyKey", "workflowType", "externalId", "state", "payload", "createdAt", "updatedAt") VALUES ($1, 'MARKET_ADMISSIBILITY', $2, 'PENDING', $3::jsonb, now(), now()) ON CONFLICT ("idempotencyKey") DO NOTHING`,
-      [`admissibility:${proposalId}`, proposalId, JSON.stringify({ proposalId, proposer: input.proposer })],
+      [`admissibility:${proposalId}`, proposalId, JSON.stringify({ kind: "market-admissibility", proposalId, idempotencyKey: `admissibility:${proposalId}`, proposer: input.proposer })],
     );
     await client.query("COMMIT");
     return { proposalId, duplicate: false };

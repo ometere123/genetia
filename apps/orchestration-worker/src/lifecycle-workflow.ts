@@ -57,8 +57,11 @@ export class GenetiaLifecycleWorkflow extends WorkflowEntrypoint<LifecycleWorkfl
                 const result = await connection.query(
                   `SELECT "idempotencyKey","nextRunAt","payload" FROM "genetia_app"."WorkflowState"
                    WHERE "workflowType"='MARKET_ADMISSIBILITY'
-                     AND "state" IN ('RETRY','RECONCILE_CLAIMED') AND "nextRunAt" <= $1
-                   ORDER BY "nextRunAt" FOR UPDATE SKIP LOCKED LIMIT $2`,
+                     AND (
+                       ("state" = 'PENDING' AND "nextRunAt" IS NULL)
+                       OR ("state" IN ('RETRY','RECONCILE_CLAIMED') AND "nextRunAt" <= $1)
+                     )
+                   ORDER BY "nextRunAt" NULLS FIRST FOR UPDATE SKIP LOCKED LIMIT $2`,
                   [now, limit],
                 );
                 for (const row of result.rows) await connection.query(

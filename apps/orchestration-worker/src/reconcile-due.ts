@@ -31,8 +31,11 @@ export async function reconcileDueLifecycleIntents(
 
   for (const row of rows) {
     let original: QueueJob;
-    try { original = validateQueueJob(row.payload); }
-    catch {
+    try {
+      const legacyProposalId = row.idempotencyKey.startsWith("admissibility:") ? row.idempotencyKey.slice("admissibility:".length) : null;
+      const payload = row.payload && typeof row.payload === "object" ? row.payload as Record<string, unknown> : {};
+      original = validateQueueJob(payload.kind === "market-admissibility" ? payload : legacyProposalId ? { kind: "market-admissibility", proposalId: legacyProposalId, idempotencyKey: row.idempotencyKey } : row.payload);
+    } catch {
       await store.releaseForRetry(row.idempotencyKey, new Date(now.getTime() + 60_000), "invalid persisted lifecycle payload");
       failed += 1;
       continue;

@@ -4,12 +4,18 @@ export interface WorkflowStarter {
   create(options: { id: string; params: QueueJob }): Promise<unknown>;
 }
 
+function stableHash(value: string, seed: number): string {
+  let hash = seed;
+  for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 export function workflowId(job: QueueJob): string {
-  // Cloudflare Workflow instance IDs may not contain punctuation such as ':'.
-  // Keep the deterministic idempotency identity while normalizing it to the
-  // instance-id character set accepted by the runtime.
-  const normalized = job.idempotencyKey.replace(/[^A-Za-z0-9_-]/g, '-');
-  return `genetia-${normalized}`;
+  // Cloudflare Workflow instance IDs have a bounded, restricted character set.
+  // Hash the full idempotency key so long recovery keys remain deterministic
+  // and collision-resistant without exceeding the platform limit.
+  const digest = `${stableHash(job.idempotencyKey, 2166136261)}${stableHash(job.idempotencyKey, 16777619)}`;
+  return `genetia-${job.kind}-${digest}`;
 }
 
 export async function dispatchQueueJob(job: unknown, env: { GENETIA_WORKFLOWS: WorkflowStarter }): Promise<string> {

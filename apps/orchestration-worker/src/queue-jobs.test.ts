@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyQueueError, expectedJobKey, validateQueueJob } from "./queue-jobs";
-import { dispatchQueueJob } from "./queue-dispatch";
+import { dispatchQueueJob, workflowId } from "./queue-dispatch";
 
 describe("durable queue contracts", () => {
   it("validates every job before execution and derives stable identities", () => {
@@ -19,7 +19,9 @@ describe("durable queue contracts", () => {
       { kind: "market-admissibility", proposalId: "p1", idempotencyKey: "admissibility:p1" },
       { GENETIA_WORKFLOWS: { create: async (options: { id: string; params: unknown }) => { calls.push(options); } } },
     );
-    expect(id).toBe("genetia-admissibility-p1");
+    expect(id).toBe(workflowId({ kind: "market-admissibility", proposalId: "p1", idempotencyKey: "admissibility:p1" }));
+    expect(id).toMatch(/^genetia-market-admissibility-[a-f0-9]{16}$/);
+    expect(id.length).toBeLessThanOrEqual(64);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.id).toBe(id);
     expect(calls[0]?.params).toMatchObject({ proposalId: "p1", kind: "market-admissibility" });
@@ -30,6 +32,6 @@ describe("durable queue contracts", () => {
       { kind: "market-admissibility", proposalId: "p1", idempotencyKey: "admissibility:p1" },
       { GENETIA_WORKFLOWS: { create: async () => { throw new Error("instance already exists"); } } },
     );
-    expect(id).toBe("genetia-admissibility-p1");
+    expect(id).toMatch(/^genetia-market-admissibility-[a-f0-9]{16}$/);
   });
 });

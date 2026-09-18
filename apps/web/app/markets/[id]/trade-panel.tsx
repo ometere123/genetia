@@ -12,7 +12,7 @@ const usdcAbi = parseAbi([
   "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
-const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC ?? "https://sepolia.base.org";
+const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC ?? "https://base-sepolia-rpc.publicnode.com";
 
 export default function TradePanel({ marketId, engine }: { marketId: string; engine: "POOL" | "LMSR" }) {
   const { t } = useI18n();

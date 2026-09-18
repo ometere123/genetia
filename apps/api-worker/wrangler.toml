@@ -4,7 +4,7 @@ compatibility_date = "2026-09-04"
 compatibility_flags = ["nodejs_compat"]
 [vars]
 BASE_CHAIN_ID = "84532"
-BASE_RPC = "https://sepolia.base.org"
+BASE_RPC = "https://base-sepolia-rpc.publicnode.com"
 GENLAYER_CHAIN_ID = "61997"
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"

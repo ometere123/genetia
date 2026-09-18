@@ -12,7 +12,7 @@ import { useI18n } from "../i18n";
 const usdc = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address;
 const balanceAbi = parseAbi(["function balanceOf(address account) view returns (uint256)"]);
 const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "" });
-const publicClient = createPublicClient({ chain: baseSepolia, transport: http(process.env.NEXT_PUBLIC_BASE_RPC ?? "https://sepolia.base.org") });
+const publicClient = createPublicClient({ chain: baseSepolia, transport: http(process.env.NEXT_PUBLIC_BASE_RPC ?? "https://base-sepolia-rpc.publicnode.com") });
 
 function usdcDisplay(raw: bigint) {
   const cents = raw / 10_000n;

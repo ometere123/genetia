@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 GENLAYER_RPC = "https://studio-dev.genlayer.com/api"
 MARKET_ADMISSIBILITY_ADDRESS = "0x8DeD1d978f70E321ADce704aF95a50314A225757"
-BASE_RPC = "https://sepolia.base.org"
+BASE_RPC = "https://base-sepolia-rpc.publicnode.com"
 BASE_DEPLOYMENT_BLOCK = "46703768"
 
 [[queues.producers]]
@@ -32,3 +32,4 @@ class_name = "GenetiaLifecycleWorkflow"
 [[hyperdrive]]
 binding = "GENETIA_DB"
 id = "5fb45c6d4ba044c9b499845a316b5fc6"
+

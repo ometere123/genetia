@@ -1,4 +1,4 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Client, type QueryResultRow } from "pg";
 import { MarketSchema, normalizeMarketCategory } from "@genetia/shared";
 
 export interface MarketReadModel {
@@ -13,17 +13,20 @@ export interface MarketReadModel {
 
 type HyperdriveLike = { connectionString: string };
 type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<QueryResultRow[]>;
-const pools = new Map<string, Pool>();
 const proposalCache = new Map<string, { value: unknown; expiresAt: number }>();
 
 function hyperdriveSql(connectionString: string): Sql {
-  let pool = pools.get(connectionString);
-  if (!pool) { pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 2500, idleTimeoutMillis: 10000 }); pools.set(connectionString, pool); }
   return async (strings, ...values) => {
     let text = strings[0] ?? "";
-    for (let i = 0; i < values.length; i++) text += `$${i + 1}${strings[i + 1] ?? ""}`;
-    const result = await pool!.query(text, values);
-    return result.rows;
+    for (let i = 0; i < values.length; i++) text += "$" + (i + 1) + (strings[i + 1] ?? "");
+    const client = new Client({ connectionString });
+    try {
+      await client.connect();
+      const result = await client.query(text, values);
+      return result.rows;
+    } finally {
+      await client.end();
+    }
   };
 }
 

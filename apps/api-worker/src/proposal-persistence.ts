@@ -1,6 +1,6 @@
 import type { Proposal } from "@genetia/shared";
 import { canonicalProposalId, type BondReceipt } from "./proposal-adapter";
-import { Pool } from "pg";
+import { Client } from "pg";
 
 type Queryable = { query: (text: string, values?: readonly unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
 type HyperdriveLike = { connectionString: string };
@@ -48,7 +48,7 @@ export async function persistVerifiedProposal(
 
 export function createHyperdriveProposalPersistence(db: HyperdriveLike) {
   return async (input: Parameters<typeof persistVerifiedProposal>[1]) => {
-    const pool = new Pool({ connectionString: db.connectionString, max: 1 });
-    try { return await persistVerifiedProposal(pool, input); } finally { await pool.end(); }
+    const client = new Client({ connectionString: db.connectionString });
+    try { await client.connect(); return await persistVerifiedProposal(client, input); } finally { await client.end(); }
   };
 }

@@ -12,7 +12,7 @@ import { canonicalProposalId, verifyBondReceipt, bondProposalIdFromReceipt } fro
 import { createHyperdriveProposalPersistence } from "./proposal-persistence";
 import { syncPrivyWalletIdentity } from "./privy-identity";
 import { PrivyClient } from "@privy-io/node";
-import { Pool } from "pg";
+import { Client } from "pg";
 
 type Env = { GENETIA_DB?: Hyperdrive; GENETIA_JOBS?: Queue; BASE_RPC?: string; PROPOSAL_BOND_ESCROW?: string; USDC_ADDRESS?: string; WEB_ORIGINS?: string; BASE_CHAIN_ID: string; GENLAYER_CHAIN_ID: string; GENLAYER_RPC: string; PRIVY_APP_ID?: string; PRIVY_APP_SECRET?: string; RECOVERY_BOND_TX_HASH?: string };
 type ReadModelFactory = (db: Hyperdrive) => MarketReadModel;
@@ -80,15 +80,16 @@ const requireWalletOwnership = async (c: any, identity: AuthIdentity, proposer: 
     const privy = new PrivyClient({ appId: c.env.PRIVY_APP_ID, appSecret: c.env.PRIVY_APP_SECRET });
     await syncPrivyWalletIdentity(c.env.GENETIA_DB, identity, (userId) => privy.users()._get(userId));
   } catch { return false; }
-  const pool = new Pool({ connectionString: c.env.GENETIA_DB.connectionString, max: 1 });
+  const client = new Client({ connectionString: c.env.GENETIA_DB.connectionString });
   try {
-    const result = await pool.query(
+    await client.connect();
+    const result = await client.query(
       `SELECT 1 FROM "genetia_app"."User" u JOIN "genetia_app"."Wallet" w ON w."userId" = u."id"
        WHERE u."privyUserId" = $1 AND w."chainId" = $2 AND lower(w."address") = lower($3) LIMIT 1`,
       [identity.userId, 84532, proposer],
     );
     return result.rowCount === 1;
-  } catch { return false; } finally { await pool.end(); }
+  } catch { return false; } finally { await client.end(); }
 };
 app.get("/health", (c) => c.json({ ok: true, baseChainId: CHAIN.base, genlayerChainId: CHAIN.genlayer, database: Boolean(c.env.GENETIA_DB) }));
 app.get("/markets", async (c) => {

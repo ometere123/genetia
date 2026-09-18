@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Client } from "pg";
 
 type AuthIdentity = { userId: string };
 
@@ -81,13 +81,11 @@ export async function syncPrivyWalletIdentity(
   getUser: (userId: string) => Promise<PrivyUser>,
 ): Promise<void> {
   const user = await getUser(identity.userId);
-  const pool = new Pool({ connectionString: db.connectionString, max: 1 });
-  let client: DbClient | undefined;
+  const client = new Client({ connectionString: db.connectionString });
   try {
-    client = await pool.connect() as unknown as DbClient;
-    await persistPrivyWalletIdentity(client, identity, user);
+    await client.connect();
+    await persistPrivyWalletIdentity(client as unknown as DbClient, identity, user);
   } finally {
-    client?.release();
-    await pool.end();
+    await client.end();
   }
 }

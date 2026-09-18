@@ -116,7 +116,7 @@ export const ProposalStatusSchema = z.object({
   manifestHash: HashSchema.optional(),
   resolver: AddressSchema.optional(),
   baseMarket: AddressSchema.optional(),
-  updatedAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(), marketId: z.string().optional(),
 });
 
 export type Engine = z.infer<typeof EngineSchema>;

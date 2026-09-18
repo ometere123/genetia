@@ -121,7 +121,7 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
         issues: Array.isArray(row.decisionIssueCodes) ? row.decisionIssueCodes : undefined,
         manifestHash: row.manifestHash ?? undefined,
         resolver: row.resolverAddress ?? undefined,
-        baseMarket: row.baseMarketAddress ?? undefined,
+        baseMarket: row.baseMarketAddress ?? undefined, marketId: row.marketId ?? undefined,
         updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt ? String(row.updatedAt) : undefined,
       };
     },

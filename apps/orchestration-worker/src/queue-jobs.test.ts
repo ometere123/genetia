@@ -19,7 +19,7 @@ describe("durable queue contracts", () => {
       { kind: "market-admissibility", proposalId: "p1", idempotencyKey: "admissibility:p1" },
       { GENETIA_WORKFLOWS: { create: async (options: { id: string; params: unknown }) => { calls.push(options); } } },
     );
-    expect(id).toBe("genetia-admissibility:p1");
+    expect(id).toBe("genetia-admissibility-p1");
     expect(calls).toHaveLength(1);
     expect(calls[0]?.id).toBe(id);
     expect(calls[0]?.params).toMatchObject({ proposalId: "p1", kind: "market-admissibility" });
@@ -30,6 +30,6 @@ describe("durable queue contracts", () => {
       { kind: "market-admissibility", proposalId: "p1", idempotencyKey: "admissibility:p1" },
       { GENETIA_WORKFLOWS: { create: async () => { throw new Error("instance already exists"); } } },
     );
-    expect(id).toBe("genetia-admissibility:p1");
+    expect(id).toBe("genetia-admissibility-p1");
   });
 });

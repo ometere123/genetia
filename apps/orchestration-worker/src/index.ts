@@ -42,14 +42,19 @@ export default {
   async queue(batch: MessageBatch<unknown>, env: Env) {
     for (const message of batch.messages) {
       try {
-        await dispatchQueueJob(message.body, env);
+        const parsed = message.body as { kind?: string; idempotencyKey?: string };
+        console.log("queue dispatch start", { kind: parsed?.kind, idempotencyKey: parsed?.idempotencyKey });
+        const workflowId = await dispatchQueueJob(message.body, env);
+        console.log("queue dispatch complete", { workflowId });
         // Durable workflow execution is attached at this boundary. A queue
         // acknowledgement is issued only after validation and dispatch have
         // completed; failures are retried or dead-lettered by the queue.
         message.ack();
       } catch (error) {
+        const messageText = error instanceof Error ? error.message : String(error);
+        console.error("queue dispatch failed", { message: messageText });
         if (classifyQueueError(error) === "dead-letter") {
-          await env.GENETIA_DLQ.send({ original: message.body, error: error instanceof Error ? error.message : "terminal queue error" });
+          await env.GENETIA_DLQ.send({ original: message.body, error: messageText });
           message.ack();
         }
         else message.retry({ delaySeconds: 60 });

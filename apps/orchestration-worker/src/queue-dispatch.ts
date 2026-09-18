@@ -5,7 +5,11 @@ export interface WorkflowStarter {
 }
 
 export function workflowId(job: QueueJob): string {
-  return `genetia-${job.idempotencyKey}`;
+  // Cloudflare Workflow instance IDs may not contain punctuation such as ':'.
+  // Keep the deterministic idempotency identity while normalizing it to the
+  // instance-id character set accepted by the runtime.
+  const normalized = job.idempotencyKey.replace(/[^A-Za-z0-9_-]/g, '-');
+  return `genetia-${normalized}`;
 }
 
 export async function dispatchQueueJob(job: unknown, env: { GENETIA_WORKFLOWS: WorkflowStarter }): Promise<string> {

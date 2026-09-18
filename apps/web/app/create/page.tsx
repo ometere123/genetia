@@ -8,7 +8,7 @@ import { GenetiaClient, MARKET_CATEGORIES, type MarketCategory, type Proposal } 
 import { getAccessToken, useLogin, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useI18n } from "../i18n";
 
-const usdcAbi = parseAbi(["function approve(address spender, uint256 amount)"]);
+const usdcAbi = parseAbi(["function approve(address spender, uint256 amount)", "function allowance(address owner, address spender) view returns (uint256)"]);
 
 export default function CreateMarketPage() {
   const { t } = useI18n();
@@ -85,10 +85,12 @@ export default function CreateMarketPage() {
       const api = new GenetiaClient({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "", headers: { authorization: `Bearer ${accessToken}`, "x-wallet-address": address } });
       const prepared = await api.prepareProposalBond(proposal, address);
       const wallet = createWalletClient({ chain: baseSepolia, transport: custom(await selected.getEthereumProvider()) });
-      if (prepared.approval) {
+      const publicClient = createPublicClient({ chain: baseSepolia, transport: http(process.env.NEXT_PUBLIC_BASE_RPC ?? "https://sepolia.base.org") });
+      const currentAllowance = prepared.approval ? await publicClient.readContract({ address: prepared.approval.token as Address, abi: usdcAbi, functionName: "allowance", args: [address, prepared.approval.spender as Address] }) : 0n;
+      if (prepared.approval && currentAllowance < BigInt(prepared.approval.amount)) {
         setStatus("USDC approval required. Confirm it in your wallet…");
         const approvalHash = await wallet.sendTransaction({ account: address, to: prepared.approval.token as Address, data: encodeFunctionData({ abi: usdcAbi, functionName: "approve", args: [prepared.approval.spender as Address, BigInt(prepared.approval.amount)] }), value: 0n, chain: baseSepolia });
-        await createPublicClient({ chain: baseSepolia, transport: http(process.env.NEXT_PUBLIC_BASE_RPC ?? "https://sepolia.base.org") }).waitForTransactionReceipt({ hash: approvalHash });
+        await publicClient.waitForTransactionReceipt({ hash: approvalHash });
       }
       setStatus("Confirm the 2 USDC proposal bond in your wallet…");
       const hash = await wallet.sendTransaction({ account: address, to: prepared.lock.to as Address, data: prepared.lock.data as `0x${string}`, value: 0n, chain: baseSepolia });

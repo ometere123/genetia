@@ -14,10 +14,11 @@ export interface MarketReadModel {
 type HyperdriveLike = { connectionString: string };
 type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<QueryResultRow[]>;
 const pools = new Map<string, Pool>();
+const proposalCache = new Map<string, { value: unknown; expiresAt: number }>();
 
 function hyperdriveSql(connectionString: string): Sql {
   let pool = pools.get(connectionString);
-  if (!pool) { pool = new Pool({ connectionString, max: 1 }); pools.set(connectionString, pool); }
+  if (!pool) { pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 2500, idleTimeoutMillis: 10000 }); pools.set(connectionString, pool); }
   return async (strings, ...values) => {
     let text = strings[0] ?? "";
     for (let i = 0; i < values.length; i++) text += `$${i + 1}${strings[i + 1] ?? ""}`;
@@ -103,27 +104,35 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
       return sql`SELECT * FROM "genetia_app"."Trade" WHERE lower("walletAddress") = lower(${address}) ORDER BY "createdAt" DESC LIMIT 500`;
     },
     async getProposal(proposalId) {
-      const rows = await sql`SELECT p.*, lower(w."address") AS "proposerAddress"
-        FROM "genetia_app"."Proposal" p
-        LEFT JOIN "genetia_app"."Wallet" w ON w."userId" = p."proposerUserId" AND w."chainId" = 84532
-        WHERE p."proposalId" = ${proposalId} OR p."proposalKey" = ${proposalId} LIMIT 1`;
-      if (!rows[0]) return null;
-      const row = rows[0] as Record<string, unknown>;
-      const workflow = String(row.workflowStatus ?? "PENDING_BOND");
-      const status = row.decision === "NEEDS_REVISION" ? "NEEDS_REVISION" : row.decision === "APPROVED" ? "APPROVED" : row.decision === "REJECTED" ? "REJECTED" : workflow === "PENDING_BOND" ? "PENDING_BOND" : "ADMISSIBILITY_SUBMITTED";
-      return {
-        proposalId: row.proposalId ?? row.proposalKey,
-        proposer: row.proposerAddress,
-        status,
-        bondStatus: row.bondStatus,
-        revisionCount: Number(row.revision ?? 0),
-        workflowStatus: workflow === "PENDING_BOND" ? "NOT_STARTED" : workflow === "BOND_CONFIRMED" ? "RUNNING" : workflow === "COMPLETE" ? "COMPLETE" : workflow === "FAILED" ? "FAILED" : "WAITING_FINALITY",
-        issues: Array.isArray(row.decisionIssueCodes) ? row.decisionIssueCodes : undefined,
-        manifestHash: row.manifestHash ?? undefined,
-        resolver: row.resolverAddress ?? undefined,
-        baseMarket: row.baseMarketAddress ?? undefined, marketId: row.marketId ?? undefined,
-        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt ? String(row.updatedAt) : undefined,
-      };
+      const cached = proposalCache.get(proposalId);
+      try {
+        const rows = await sql`SELECT p.*, lower(w."address") AS "proposerAddress"
+          FROM "genetia_app"."Proposal" p
+          LEFT JOIN "genetia_app"."Wallet" w ON w."userId" = p."proposerUserId" AND w."chainId" = 84532
+          WHERE p."proposalId" = ${proposalId} OR p."proposalKey" = ${proposalId} LIMIT 1`;
+        if (!rows[0]) return null;
+        const row = rows[0] as Record<string, unknown>;
+        const workflow = String(row.workflowStatus ?? "PENDING_BOND");
+        const value = {
+          proposalId: row.proposalId ?? row.proposalKey,
+          proposer: row.proposerAddress,
+          status: row.decision === "NEEDS_REVISION" ? "NEEDS_REVISION" : row.decision === "APPROVED" ? "APPROVED" : row.decision === "REJECTED" ? "REJECTED" : workflow === "PENDING_BOND" ? "PENDING_BOND" : "ADMISSIBILITY_SUBMITTED",
+          bondStatus: row.bondStatus,
+          revisionCount: Number(row.revision ?? 0),
+          workflowStatus: workflow === "PENDING_BOND" ? "NOT_STARTED" : workflow === "BOND_CONFIRMED" ? "RUNNING" : workflow === "COMPLETE" ? "COMPLETE" : workflow === "FAILED" ? "FAILED" : "WAITING_FINALITY",
+          issues: Array.isArray(row.decisionIssueCodes) ? row.decisionIssueCodes : undefined,
+          manifestHash: row.manifestHash ?? undefined,
+          resolver: row.resolverAddress ?? undefined,
+          baseMarket: row.baseMarketAddress ?? undefined,
+          marketId: row.marketId ?? undefined,
+          updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt ? String(row.updatedAt) : undefined,
+        };
+        proposalCache.set(proposalId, { value, expiresAt: Date.now() + 60000 });
+        return value;
+      } catch (error) {
+        if (cached && cached.expiresAt > Date.now()) return cached.value;
+        throw error;
+      }
     },
     async getPrices(marketId) {
       const rows = await sql`SELECT "engine", "poolYesTotal", "poolNoTotal", "lmsrB", "lmsrFundingTarget", "status" FROM "genetia_app"."Market" WHERE "marketId" = ${marketId} LIMIT 1`;
@@ -136,3 +145,4 @@ export function createMarketReadModel(db: HyperdriveLike): MarketReadModel {
     },
   };
 }
+

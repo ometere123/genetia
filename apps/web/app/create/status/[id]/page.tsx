@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GenetiaClient, type ProposalStatus } from "@genetia/sdk";
 import { useI18n } from "../../../i18n";
 
@@ -10,16 +10,21 @@ export default function ProposalStatusPage({ params }: { params: { id: string } 
   const { t } = useI18n();
   const [state, setState] = useState<ProposalStatus>();
   const [error, setError] = useState<string>();
+  const hasState = useRef(false);
 
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const load = () => api().proposal(params.id).then((value) => {
       if (!active) return;
+      hasState.current = true;
       setState(value);
+      setError(undefined);
       if (!value.marketId && value.workflowStatus === "RUNNING") timer = setTimeout(load, 5000);
     }).catch((reason) => {
-      if (active) setError(reason instanceof Error ? reason.message : "Proposal status unavailable");
+      if (!active) return;
+      if (!hasState.current) setError(reason instanceof Error ? reason.message : "Proposal status unavailable");
+      timer = setTimeout(load, 5000);
     });
     load();
     return () => { active = false; if (timer) clearTimeout(timer); };
